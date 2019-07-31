@@ -1,4 +1,6 @@
 vaeganlogs/
 model_vaegan/
-~.pyc
+*.pyc
 results/
+__pycache__/
+__pycache_/

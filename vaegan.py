@@ -38,8 +38,9 @@ class vaegan(object):
         self.ckp_dir = ckp_dir
         self.learn_rate_init = learnrate_init
         self.log_vars = []
-        self._lambda1 = _lambda[0]
-        self._lambda2 = _lambda[1]
+        self.alpha = _lambda[0]
+        self.beta = _lambda[1]
+        self.gamma = _lambda[2]
         self.channel = 3
         self.output_size = 64
         self.theta_ph = mdevice.get_theta_ph(hparams)
@@ -108,14 +109,17 @@ class vaegan(object):
         self.D_loss = self.D_fake_loss + self.D_real_loss + self.D_tilde_loss
 
         # preceptual loss(feature loss)
-        self.PL_loss = self._lambda2 * tf.reduce_mean(tf.reduce_sum(
+        self.PL_loss =  tf.reduce_mean(tf.reduce_sum(
             self.NLLNormal(self.l_x_tilde, self.l_x), [1, 2, 3])) / (4 * 4 * 256)
-        self.L2_loss = self._lambda1 * tf.reduce_mean(tf.reduce_sum(
-            self.NLLNormal(self.x_tilde, self.x_lossy), [1, 2, 3])) / (64 * 64 * 3)
+        L2_loss_1 =  tf.reduce_mean(tf.reduce_sum(
+            self.NLLNormal(self.x_tilde, self.x_lossy), [1, 2, 3])) / (64 * 64 * 3) 
+        L2_loss_2 = tf.reduce_mean(tf.reduce_sum(
+            self.NLLNormal(self.x_tilde_lossy, self.x_lossy), [1, 2, 3])) / (64 * 64 * 3)
+        self.L2_loss = L2_loss_1 if self.gamma == 0 else L2_loss_2
         #For encode
         # - self.LL_loss / (4 * 4 * 64)
         #self.kl_loss/(self.latent_dim*self.batch_size)-
-        self.encode_loss = self.kl_loss - self.L2_loss  - self.PL_loss 
+        self.encode_loss = self.kl_loss - self.alpha * self.L2_loss - self.beta *self.PL_loss
 
         #for Gen
         # - 1e-6*self.LL_loss
@@ -225,7 +229,7 @@ class vaegan(object):
                                                self.L2_loss, self.kl_loss, self.recon_loss, new_learning_rate], feed_dict=fd)
                     all_loss_test = sess.run([self.D_loss, self.G_loss, self.encode_loss, self.PL_loss,
                                               self.L2_loss, self.kl_loss, self.recon_loss, new_learning_rate], feed_dict=fd_test)
-                    print("Step %d: D: loss = %.7f G: loss=%.7f E: loss=%.7f LL loss=%.7f L2 loss=%.7f KL=%.7f RC=%.7f, LR=%.7f" % (
+                    print("Step %d: D: loss = %.7f G: loss=%.7f E: loss=%.7f PL loss=%.7f L2 loss=%.7f KL=%.7f RC=%.7f, LR=%.7f" % (
                         step, all_loss_train[0], all_loss_train[1], all_loss_train[2], all_loss_train[3],
                          all_loss_train[4], all_loss_train[5], all_loss_train[6], all_loss_train[7]))
                     summary_str = tf.Summary()
