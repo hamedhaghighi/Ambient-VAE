@@ -77,7 +77,6 @@ def imread(path, is_grayscale=False):
 
 def imsave(images, size, path, measure_dict, titles):
     fig = plt.figure()
-    fig.subplots_adjust(wspace=0.8)
     gs = matplotlib.gridspec.GridSpec(2, 4, figure = fig)
     for i in range(4):
         f_ax = fig.add_subplot(gs[0, i])

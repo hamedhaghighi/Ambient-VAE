@@ -197,6 +197,7 @@ class vaegan(object):
             summary_writer_test = tf.summary.FileWriter(
                 '{}/{}/test'.format(self.log_dir, now), sess.graph)
             step = 0
+            best_loss = np.inf
             if self.load_type != 'none' and os.path.exists(self.ckp_dir + '/' + self.load_type):
                 ckpt = tf.train.get_checkpoint_state(
                     self.ckp_dir, latest_filename=self.load_type)
@@ -205,6 +206,7 @@ class vaegan(object):
                     g_step = int(ckpt.model_checkpoint_path.split(
                         '/')[-1].split('-')[-1])
                     sess.run(global_step.assign(g_step))
+                    best_loss = np.load(self.ckp_dir + '/' + 'best_loss.npy')
                     print('model restored')
 
             step = global_step.eval()
@@ -223,7 +225,7 @@ class vaegan(object):
             }
             
             # inf_net = inf_def.InferenceNetwork()
-            best_loss = np.inf
+            
             while step <= self.max_iters:
                 next_x_images = sess.run(self.next_x)
 
@@ -293,14 +295,13 @@ class vaegan(object):
                     save_images(sample_images, [self.batch_size/8, 8],
                                 '{}/train_{:02d}_images.png'.format(self.log_dir, step), measure_dict, titles)
                 if (step+1) % self.save_every == 0:
-                    self.saver.save(sess, self.ckp_dir + '/last.ckpt',
-                                    global_step=global_step, latest_filename='last')
+                    self.saver.save(sess, self.ckp_dir + '/last.ckpt',global_step=global_step, latest_filename='last')                                 
                     print("Model saved in file: %s" % self.ckp_dir)
                 if (step+1)% self.save_every//2 == 0:
                     if rc < best_loss:
                         best_loss = rc
-                        self.saver_best.save(sess, self.ckp_dir + '/best.ckpt',
-                                        global_step=global_step, latest_filename='best')
+                        np.save(self.ckp_dir + '/' + 'best_loss.npy', best_loss)
+                        self.saver_best.save(sess, self.ckp_dir + '/best.ckpt',global_step=global_step, latest_filename='best')                                      
                         print("Best model saved in file: %s" % self.ckp_dir)
 
                 step += 1
