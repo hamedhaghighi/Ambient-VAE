@@ -62,8 +62,8 @@ def center_crop(x, crop_h , crop_w=None, resize_w=64):
 
 def save_images(images, size, image_path, measure_dict, titles):
     images = [merge(img , size) for img in images]
-    PSNR = compare_psnr(images[0] , images[1])
-    SSIM = compare_ssim(images[0], images[1], multichannel=True)
+    PSNR = compare_psnr(images[0] , images[2])
+    SSIM = compare_ssim(images[0], images[2], multichannel=True)
     measure_dict['psnr'].append(PSNR)
     measure_dict['ssim'].append(SSIM)
     return imsave(images, size, image_path,measure_dict, titles)
