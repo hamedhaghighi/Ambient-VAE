@@ -150,6 +150,7 @@ class vaegan(object):
         self.e_vars = [var for var in t_vars if 'e_' in var.name]
 
         self.saver = tf.train.Saver(max_to_keep=3)
+        self.saver_best = tf.train.Saver(max_to_keep=1)
         self.summ = []
         for k, v in self.log_vars:
             self.summ.append(tf.summary.scalar(k, v))
@@ -215,9 +216,14 @@ class vaegan(object):
             # test_images =_load_mnist(self.batch_size)
             # test_images = mnist.test.next_batch(self.batch_size)[0]
             # test_images = np.reshape(test_images,[-1,28,28,1])
-
-            loss_list = []
+            measure_dict = {
+                'recon_loss':[],
+                'psnr':[],
+                'ssim':[]
+            }
+            
             # inf_net = inf_def.InferenceNetwork()
+            best_loss = np.inf
             while step <= self.max_iters:
                 next_x_images = sess.run(self.next_x)
 
@@ -267,7 +273,7 @@ class vaegan(object):
 
                     rec_images, lossy_images, generated_image, rc = sess.run(
                         [self.x_tilde, self.x_lossy, self.x_p, self.recon_loss], feed_dict=fd_test)
-                    loss_list.append(rc)
+                    measure_dict['recon_loss'].append(rc)
                     # y_hat_val = inf_net.get_y_hat_val(rec_images)
                     # inception_score = get_inception_score(y_hat_val)
                     # score_list.append(inception_score)
@@ -283,13 +289,19 @@ class vaegan(object):
                                      generated_image[0:self.batch_size]]
                     # save_images(sample_images[0:self.batch_size] , [self.batch_size/8, 8], '{}/train_{:02d}_recon.png'.format(self.sample_path, step))
                     titles = ['orig', 'lossy', 'reconstructed',
-                              'generated', 'recon_loss']
+                              'generated']
                     save_images(sample_images, [self.batch_size/8, 8],
-                                '{}/train_{:02d}_images.png'.format(self.log_dir, step), loss_list, titles)
+                                '{}/train_{:02d}_images.png'.format(self.log_dir, step), measure_dict, titles)
                 if (step+1) % self.save_every == 0:
                     self.saver.save(sess, self.ckp_dir + '/last.ckpt',
                                     global_step=global_step, latest_filename='last')
                     print("Model saved in file: %s" % self.ckp_dir)
+                if (step+1)% self.save_every//2 == 0:
+                    if rc < best_loss:
+                        best_loss = rc
+                        self.saver_best.save(sess, self.ckp_dir + '/best.ckpt',
+                                        global_step=global_step, latest_filename='best')
+                        print("Best model saved in file: %s" % self.ckp_dir)
 
                 step += 1
                 new_learn_rate = sess.run(new_learning_rate)

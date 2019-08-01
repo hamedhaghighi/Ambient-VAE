@@ -5,6 +5,7 @@ from skimage import io
 import scipy
 import scipy.misc
 from skimage.transform import resize
+from skimage.measure import compare_psnr , compare_ssim
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 import matplotlib
@@ -59,8 +60,13 @@ def center_crop(x, crop_h , crop_w=None, resize_w=64):
 
 
 
-def save_images(images, size, image_path, scores, titles):
-    return imsave(images, size, image_path,scores, titles)
+def save_images(images, size, image_path, measure_dict, titles):
+    images = [merge(img , size) for img in images]
+    PSNR = compare_psnr(images[0] , images[1])
+    SSIM = compare_ssim(images[0], images[1], multichannel=True)
+    measure_dict['psnr'].append(PSNR)
+    measure_dict['ssim'].append(SSIM)
+    return imsave(images, size, image_path,measure_dict, titles)
 
 def imread(path, is_grayscale=False):
     if (is_grayscale):
@@ -69,18 +75,19 @@ def imread(path, is_grayscale=False):
         return io.imread(path.decode('utf-8')).astype(np.float)
 
 
-def imsave(images, size, path, scores, titles):
+def imsave(images, size, path, measure_dict, titles):
     fig = plt.figure()
+    fig.subplots_adjust(wspace=0.8)
     gs = matplotlib.gridspec.GridSpec(2, 4, figure = fig)
     for i in range(4):
         f_ax = fig.add_subplot(gs[0, i])
         f_ax.set_title(titles[i])
-        f_ax.imshow(merge(images[i], size))
-    
-    f_ax = fig.add_subplot(gs[1, 0])
-    f_ax.set_title(titles[4])
-    f_ax.plot(np.arange(len(scores)) + 1 , scores) 
-    fig.savefig(path , format='png')
+        f_ax.imshow(images[i])
+    for ind , (k , v) in enumerate(measure_dict.items()):
+        f_ax = fig.add_subplot(gs[1, ind])
+        f_ax.set_title(k)
+        f_ax.plot(np.arange(len(v)) + 1 , v) 
+        fig.savefig(path , format='png')
     plt.close()
 
 def merge(images, size):
