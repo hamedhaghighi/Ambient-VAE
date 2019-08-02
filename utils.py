@@ -86,7 +86,7 @@ def imsave(images, size, path, measure_dict, titles):
         f_ax = fig.add_subplot(gs[1, ind])
         f_ax.set_title(k)
         f_ax.plot(np.arange(len(v)) + 1 , v) 
-        fig.savefig(path , format='png')
+    fig.savefig(path , format='png')
     plt.close()
 
 def merge(images, size):

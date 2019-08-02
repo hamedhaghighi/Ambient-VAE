@@ -386,6 +386,11 @@ class vaegan(object):
             theta_val = self.mdevice.sample_theta(self.hparams, self.batch_size)
             # sess.run(self.opt_reinit_op)
             feed_dict = {self.images: test_images, self.theta_ph: theta_val}
+            measure_dict = {
+                'recon_loss': [],
+                'psnr': [],
+                'ssim': []
+            }
             for j in range(30):
 
                 _, lr_val, total_loss_val, \
@@ -406,14 +411,12 @@ class vaegan(object):
                                             zp_loss_val,
                                             d_loss1_val,
                                             d_loss2_val))
-                measure_dict = {
-                    'recon_loss':[],
-                    'psnr':[],
-                    'ssim':[]
-                }
+               
                 titles = ['orig', 'lossy', 'reconstructed']
                 
                 images = sess.run([self.images,self.x_lossy,self.x_p], feed_dict = feed_dict)
+                if self.hparams.measurement_type == "drop_independent":
+                        images[1] = images[1] * (1-self.hparams.drop_prob)
                 measure_dict['recon_loss'].append(((images[0] - images[2])**2).mean())
                 save_images(images, [8, 8],'{}/test/{:02d}_images.png'.format(self.log_dir, j), measure_dict, titles)
           
