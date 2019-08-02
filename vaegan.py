@@ -1,6 +1,6 @@
 import tensorflow as tf
 from ops import batch_normal, de_conv, conv2d, fully_connect, lrelu
-from utils import save_images, get_image, load_celebA, normalize
+from utils import save_images, get_image, load_celebA, normalize, merge
 from utils import CelebA
 import numpy as np
 from commons import arch
@@ -8,6 +8,7 @@ from commons import measure
 from commons.mnist.inf import inf_def
 from commons.utils import get_inception_score
 # import cv2
+from skimage import io
 from tensorflow.python.framework.ops import convert_to_tensor
 from tensorflow.examples.tutorials.mnist import input_data
 import os
@@ -155,6 +156,46 @@ class vaegan(object):
         self.summ = []
         for k, v in self.log_vars:
             self.summ.append(tf.summary.scalar(k, v))
+
+    def get_opt_reinit_op(self, opt, var_list, global_step):
+        opt_slots = [opt.get_slot(var, name)
+                    for name in opt.get_slot_names() for var in var_list]
+        if isinstance(opt, tf.train.AdamOptimizer):
+            opt_slots.extend([opt._beta1_power, opt._beta2_power])  # pylint: disable = W0212
+        all_opt_variables = opt_slots + var_list + [global_step]
+        opt_reinit_op = tf.variables_initializer(all_opt_variables)
+        return opt_reinit_op
+
+    def build_model_vaegan_test(self):
+
+        self.x_lossy = arch.get_lossy(
+            self.hparams, self.mdevice, self.images, self.theta_ph)
+        self.z_batch = tf.Variable(tf.random_normal([self.batch_size, 128]), name='z_batch')
+        self.x_p = self.generate(self.z_batch)
+        self.x_p_lossy = arch.get_lossy(self.hparams, self.mdevice, self.x_p, self.theta_ph)
+        _, prob = self.discriminate(self.x_p_lossy)
+        # define all losses
+        m_loss1_batch = tf.reduce_mean(tf.abs(self.x_lossy - self.x_p_lossy), (1, 2, 3))
+        m_loss2_batch = tf.reduce_mean((self.x_lossy - self.x_p_lossy)**2, (1, 2, 3))
+        zp_loss_batch = tf.reduce_sum(self.z_batch**2, 1)
+        
+        d_loss1_batch = -1*tf.log(prob)
+        d_loss2_batch = tf.log(1-prob)
+        ml2_w, ml1_w, zp_w, dl1_w, dl2_w =1, 0, 0.01, 0, 0
+        # define total loss
+        total_loss_batch = ml1_w * m_loss1_batch \
+            + ml2_w * m_loss2_batch \
+            + zp_w * zp_loss_batch \
+            + dl1_w * d_loss1_batch \
+            + dl2_w * d_loss2_batch
+        self.total_loss = tf.reduce_mean(total_loss_batch)
+
+        self.m_loss1 = tf.reduce_mean(m_loss1_batch)
+        self.m_loss2 = tf.reduce_mean(m_loss2_batch)
+        self.zp_loss = tf.reduce_mean(zp_loss_batch)
+        self.d_loss1 = tf.reduce_mean(d_loss1_batch)
+        self.d_loss2 = tf.reduce_mean(d_loss2_batch)
+
 
     #do train
     def train(self):
@@ -311,34 +352,61 @@ class vaegan(object):
                     sess.run(add_global)
 
     def test(self):
-
+        # Set up gradient descent
+        var_list = [self.z_batch]
+        global_step = tf.Variable(0, trainable=False, name='global_step')
+        learning_rate = tf.constant(0.1)
+        with tf.variable_scope(tf.get_variable_scope(), reuse=False):
+            opt = tf.train.AdamOptimizer(learning_rate)
+            update_op = opt.minimize(
+                self.total_loss, var_list=var_list, global_step=global_step, name='update_op')
+        # self.opt_reinit_op = self.get_opt_reinit_op(opt, var_list, global_step)
         init = tf.global_variables_initializer()
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
 
         with tf.Session(config=config) as sess:
-
+            sess.run(self.val_init_op)
             # Initialzie the iterator
             sess.run(self.training_init_op)
 
             sess.run(init)
-            # self.saver.restore(sess, self.saved_model_path)
+            
+            if self.load_type != 'none' and os.path.exists(self.ckp_dir + '/' + self.load_type):
+                ckpt = tf.train.get_checkpoint_state(
+                    self.ckp_dir, latest_filename=self.load_type)
+                if ckpt and ckpt.model_checkpoint_path:
+                    self.saver.restore(sess, ckpt.model_checkpoint_path)
+                    self.best_loss = np.load(self.ckp_dir + '/' + 'best_loss.npy')
+                    print('model restored')
+            test_images = sess.run(self.next_x_val)
+            theta_val = self.mdevice.sample_theta(self.hparams, self.batch_size)
+            # sess.run(self.opt_reinit_op)
+            feed_dict = {self.images: test_images, self.theta_ph: theta_val}
+            for j in range(30):
 
-            next_x_images = sess.run(self.next_x)
-
-            # real_images, sample_images = sess.run([self.images, self.x_tilde], feed_dict={self.images: next_x_images})
-            sample_images = sess.run(self.x_p)
-            save_images(sample_images[0:self.batch_size], [
-                        self.batch_size/8, 8], '{}/train_{:02d}_{:04d}_con.png'.format(self.log_dir, 0, 0))
-            # save_images(real_images[0:self.batch_size], [self.batch_size/8, 8], '{}/train_{:02d}_{:04d}_r.png'.format(self.sample_path, 0, 0))
-
-            # ri = cv2.imread('{}/train_{:02d}_{:04d}_r.png'.format(self.sample_path, 0, 0), 1)
-            # fi = cv2.imread('{}/train_{:02d}_{:04d}_con.png'.format(self.sample_path, 0, 0), 1)
-            #
-            # cv2.imshow('real_image', ri)
-            # cv2.imshow('reconstruction', fi)
-            #
-            # cv2.waitKey(-1)
+                _, lr_val, total_loss_val, \
+                    m_loss1_val, \
+                    m_loss2_val, \
+                    zp_loss_val, \
+                    d_loss1_val, \
+                    d_loss2_val = sess.run([update_op, learning_rate, self.total_loss,
+                                            self.m_loss1,
+                                            self.m_loss2,
+                                            self.zp_loss,
+                                            self.d_loss1,
+                                            self.d_loss2], feed_dict=feed_dict)
+                logging_format = 'rr {} iter {} lr {} total_loss {:.3f} m_loss1 {:.3f} m_loss2 {:.3f} zp_loss {:.3f} d_loss1 {:.3f} d_loss2 {:.3f}'
+                print (logging_format.format(1, j, lr_val, total_loss_val,
+                                            m_loss1_val,
+                                            m_loss2_val,
+                                            zp_loss_val,
+                                            d_loss1_val,
+                                            d_loss2_val))
+                x_rec = sess.run([self.x_p], feed_dict = feed_dict)
+                x_rec = merge(x_rec[0],[8, 8])
+                io.imsave('{}/test/{:02d}_images.png'.format(self.log_dir, j), x_rec)
+          
 
     def discriminate(self, x_var, reuse=False):
 

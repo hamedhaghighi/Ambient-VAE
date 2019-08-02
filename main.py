@@ -59,6 +59,8 @@ if __name__ == "__main__":
             shutil.rmtree(vaegan_checkpoint_dir)
     if not os.path.isdir(root_log_dir):
         mkdir_p(root_log_dir)
+    if not os.path.isdir(root_log_dir + '/test'):
+        mkdir_p(root_log_dir + '/test')
     if not os.path.isdir(vaegan_checkpoint_dir):
         mkdir_p(vaegan_checkpoint_dir)
 
@@ -84,5 +86,5 @@ if __name__ == "__main__":
         vaeGan.train()
 
     else:
-        vaeGan.build_model_vaegan()
+        vaeGan.build_model_vaegan_test()
         vaeGan.test()
