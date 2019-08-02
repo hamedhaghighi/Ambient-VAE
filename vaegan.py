@@ -353,6 +353,9 @@ class vaegan(object):
 
     def test(self):
         # Set up gradient descent
+        t_vars = tf.trainable_variables()
+        g_vars = [var for var in t_vars if ('gen' in var.name) or ('dis' in var.name)]
+        self.saver = tf.train.Saver(var_list= g_vars)
         var_list = [self.z_batch]
         global_step = tf.Variable(0, trainable=False, name='global_step')
         learning_rate = tf.constant(0.1)
@@ -396,7 +399,7 @@ class vaegan(object):
                                             self.zp_loss,
                                             self.d_loss1,
                                             self.d_loss2], feed_dict=feed_dict)
-                logging_format = 'rr {} iter {} lr {} total_loss {:.3f} m_loss1 {:.3f} m_loss2 {:.3f} zp_loss {:.3f} d_loss1 {:.3f} d_loss2 {:.3f}'
+                logging_format = 'rr {} iter {} lr {:.3f} total_loss {:.3f} m_loss1 {:.3f} m_loss2 {:.3f} zp_loss {:.3f} d_loss1 {:.3f} d_loss2 {:.3f}'
                 print (logging_format.format(1, j, lr_val, total_loss_val,
                                             m_loss1_val,
                                             m_loss2_val,
