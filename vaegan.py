@@ -406,9 +406,16 @@ class vaegan(object):
                                             zp_loss_val,
                                             d_loss1_val,
                                             d_loss2_val))
-                x_rec = sess.run([self.x_p], feed_dict = feed_dict)
-                x_rec = merge(x_rec[0],[8, 8])
-                io.imsave('{}/test/{:02d}_images.png'.format(self.log_dir, j), x_rec)
+                measure_dict = {
+                    'recon_loss':[],
+                    'psnr':[],
+                    'ssim':[]
+                }
+                titles = ['orig', 'lossy', 'reconstructed']
+                
+                images = sess.run([self.images,self.x_lossy,self.x_p], feed_dict = feed_dict)
+                measure_dict['recon_loss'].append(((images[0] - images[2])**2).mean())
+                save_images(images, [8, 8],'{}/test/{:02d}_images.png'.format(self.log_dir, j), measure_dict, titles)
           
 
     def discriminate(self, x_var, reuse=False):
