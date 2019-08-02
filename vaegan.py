@@ -172,7 +172,7 @@ class vaegan(object):
             self.hparams, self.mdevice, self.images, self.theta_ph)
         self.z_batch = tf.Variable(tf.random_normal([self.batch_size, 128]), name='z_batch')
         self.x_p = self.generate(self.z_batch)
-        self.x_p_lossy = arch.get_lossy(self.hparams, self.mdevice, self.x_p, self.theta_ph)
+        self.x_p_lossy = arch.get_lossy(self.hparams, self.mdevice, self.x_p, self.theta_ph_xp)
         _, prob = self.discriminate(self.x_p_lossy)
         # define all losses
         m_loss1_batch = tf.reduce_mean(tf.abs(self.x_lossy - self.x_p_lossy), (1, 2, 3))
@@ -385,14 +385,15 @@ class vaegan(object):
             test_images = sess.run(self.next_x_val)
             theta_val = self.mdevice.sample_theta(self.hparams, self.batch_size)
             # sess.run(self.opt_reinit_op)
-            feed_dict = {self.images: test_images, self.theta_ph: theta_val}
+            
             measure_dict = {
                 'recon_loss': [],
                 'psnr': [],
                 'ssim': []
             }
-            for j in range(30):
-
+            for j in range(100):
+                theta_val_xp = self.mdevice.sample_theta(self.hparams, self.batch_size)
+                feed_dict = {self.images: test_images, self.theta_ph: theta_val,self.theta_ph_xp: theta_val_xp}
                 _, lr_val, total_loss_val, \
                     m_loss1_val, \
                     m_loss2_val, \
@@ -411,15 +412,15 @@ class vaegan(object):
                                             zp_loss_val,
                                             d_loss1_val,
                                             d_loss2_val))
-               
-                titles = ['orig', 'lossy', 'reconstructed']
-                
-                images = sess.run([self.images,self.x_lossy,self.x_p], feed_dict = feed_dict)
-                if self.hparams.measurement_type == "drop_independent":
-                        images[1] = images[1] * (1-self.hparams.drop_prob)
-                measure_dict['recon_loss'].append(((images[0] - images[2])**2).mean())
-                save_images(images, [8, 8],'{}/test/{:02d}_images.png'.format(self.log_dir, j), measure_dict, titles)
-          
+                if j % 10 == 0:
+                    titles = ['orig', 'lossy', 'reconstructed']
+                    
+                    images = sess.run([self.images,self.x_lossy,self.x_p], feed_dict = feed_dict)
+                    if self.hparams.measurement_type == "drop_independent":
+                            images[1] = images[1] * (1-self.hparams.drop_prob)
+                    measure_dict['recon_loss'].append(((images[0] - images[2])**2).mean())
+                    save_images(images, [8, 8],'{}/test/{:02d}_images.png'.format(self.log_dir, j), measure_dict, titles)
+                    # self.mdevice.unmeasure_np(hparams, x_measured_val, theta_val)
 
     def discriminate(self, x_var, reuse=False):
 

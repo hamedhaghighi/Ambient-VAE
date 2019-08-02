@@ -140,8 +140,6 @@ class DropMaskType1(DropDevice):
         mask = np.float32(mask >= p)/(1 - p)
         theta_val = np.ones(shape=self.batch_dims)
         theta_val = theta_val * mask
-        import pdb
-        # pdb.set_trace()
         return theta_val
 
 
