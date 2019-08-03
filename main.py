@@ -34,10 +34,10 @@ flags.DEFINE_string('load', 'none','load best last' )
 flags.DEFINE_string('exp_name', '', 'name of experiment')
 flags.DEFINE_float("lr_test", 0.1, "the init of learn rate")
 flags.DEFINE_float("ml1_w", 0, "the init of learn rate")
-flags.DEFINE_float("ml2_w", 1, "the init of learn rate")
+flags.DEFINE_float("ml2_w", 0, "the init of learn rate")
 flags.DEFINE_float("dl1_w", 0, "the init of learn rate")
 flags.DEFINE_float("dl2_w", 0, "the init of learn rate")
-flags.DEFINE_float("zp_w", 0.001, "the init of learn rate")
+flags.DEFINE_float("zp_w", 0, "the init of learn rate")
 flags.DEFINE_integer("iter_test", 100, "the init of learn rate")
 FLAGS = flags.FLAGS
 hparams = hparams_def.get_hparams(FLAGS)
@@ -66,8 +66,10 @@ if __name__ == "__main__":
             shutil.rmtree(vaegan_checkpoint_dir)
     if not os.path.isdir(root_log_dir):
         mkdir_p(root_log_dir)
-    if not os.path.isdir(root_log_dir + '/test'):
-        mkdir_p(root_log_dir + '/test')
+    if not os.path.isdir(root_log_dir + '/test_{}_{}_{}'.format(FLAGS.ml2_w, FLAGS.dl1_w,
+                                                              FLAGS.zp_w)):
+        mkdir_p(root_log_dir + '/test_{}_{}_{}'.format(FLAGS.ml1_w, FLAGS.dl1_w,
+                                                              FLAGS.zp_w))
     if not os.path.isdir(vaegan_checkpoint_dir):
         mkdir_p(vaegan_checkpoint_dir)
 

@@ -174,9 +174,10 @@ class vaegan(object):
         self.z_batch = tf.Variable(tf.random_normal([self.batch_size, 128]), name='z_batch')
         self.x_p = self.generate(self.z_batch)
         self.x_p_lossy = arch.get_lossy(self.hparams, self.mdevice, self.x_p, self.theta_ph_xp)
-        _, logit = self.discriminate(self.x_p_lossy)
+        self.lp_lossy, logit = self.discriminate(self.x_p_lossy)
+        self.lp, _ = self.discriminate(self.x_lossy, reuse=True)
         # define all losses
-        m_loss1_batch = tf.reduce_mean(tf.abs(self.x_lossy - self.x_p_lossy), (1, 2, 3))
+        m_loss1_batch = tf.reduce_mean((self.lp_lossy - self.lp)**2, (1, 2, 3))
         m_loss2_batch = tf.reduce_mean((self.x_lossy - self.x_p_lossy)**2, (1, 2, 3))
         zp_loss_batch = tf.reduce_sum(self.z_batch**2, 1)
         
@@ -184,13 +185,13 @@ class vaegan(object):
             tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(logit), logits=logit))
         d_loss2_batch = -1*tf.reduce_mean(
             tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(logit), logits=logit))
-        ml2_w, ml1_w, zp_w, dl1_w, dl2_w = self.FLAGS.ml2_w, self.FLAGS.ml1_w, self.FLAGS.zp_w, self.FLAGS.dl1_w, self.FLAGS.dl2_w
+        self.ml2_w, self.ml1_w, self.zp_w, self.dl1_w, self.dl2_w = self.FLAGS.ml2_w, self.FLAGS.ml1_w, self.FLAGS.zp_w, self.FLAGS.dl1_w, self.FLAGS.dl2_w
         # define total loss
-        total_loss_batch = ml1_w * m_loss1_batch \
-            + ml2_w * m_loss2_batch \
-            + zp_w * zp_loss_batch \
-            + dl1_w * d_loss1_batch \
-            + dl2_w * d_loss2_batch
+        total_loss_batch = self.ml1_w * m_loss1_batch \
+            + self.ml2_w * m_loss2_batch \
+            + self.zp_w * zp_loss_batch \
+            + self.dl1_w * d_loss1_batch \
+            + self.dl2_w * d_loss2_batch
         self.total_loss = tf.reduce_mean(total_loss_batch)
 
         self.m_loss1 = tf.reduce_mean(m_loss1_batch)
@@ -422,7 +423,8 @@ class vaegan(object):
                     if self.hparams.measurement_type == "drop_independent":
                             images[1] = images[1] * (1-self.hparams.drop_prob)
                     measure_dict['recon_loss'].append(((images[0] - images[2])**2).mean())
-                    save_images(images, [8, 8],'{}/test/{:02d}_images.png'.format(self.log_dir, j), measure_dict, titles)
+                    save_images(images, [8, 8], '{}/test_{}_{}_{}/{:02d}_images.png'.format(self.log_dir, self.ml1_w, self.dl1_w,
+                    self.zp_w , j), measure_dict, titles)
                     # self.mdevice.unmeasure_np(hparams, x_measured_val, theta_val)
 
     def discriminate(self, x_var, reuse=False):
