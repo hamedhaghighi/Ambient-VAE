@@ -394,7 +394,7 @@ class vaegan(object):
                 'psnr': [],
                 'ssim': []
             }
-            for j in range(100):
+            for j in range(self.FLAGS.iter_test):
                 theta_val_xp = self.mdevice.sample_theta(self.hparams, self.batch_size)
                 feed_dict = {self.images: test_images, self.theta_ph: theta_val,self.theta_ph_xp: theta_val_xp}
                 _, lr_val, total_loss_val, \

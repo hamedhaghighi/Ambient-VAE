@@ -38,7 +38,7 @@ flags.DEFINE_float("ml2_w", 1, "the init of learn rate")
 flags.DEFINE_float("dl1_w", 0, "the init of learn rate")
 flags.DEFINE_float("dl2_w", 0, "the init of learn rate")
 flags.DEFINE_float("zp_w", 0.001, "the init of learn rate")
-
+flags.DEFINE_integer("iter_test", 100, "the init of learn rate")
 FLAGS = flags.FLAGS
 hparams = hparams_def.get_hparams(FLAGS)
 if __name__ == "__main__":
