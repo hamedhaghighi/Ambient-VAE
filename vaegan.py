@@ -173,14 +173,16 @@ class vaegan(object):
         self.z_batch = tf.Variable(tf.random_normal([self.batch_size, 128]), name='z_batch')
         self.x_p = self.generate(self.z_batch)
         self.x_p_lossy = arch.get_lossy(self.hparams, self.mdevice, self.x_p, self.theta_ph_xp)
-        _, prob = self.discriminate(self.x_p_lossy)
+        _, logit = self.discriminate(self.x_p_lossy)
         # define all losses
         m_loss1_batch = tf.reduce_mean(tf.abs(self.x_lossy - self.x_p_lossy), (1, 2, 3))
         m_loss2_batch = tf.reduce_mean((self.x_lossy - self.x_p_lossy)**2, (1, 2, 3))
         zp_loss_batch = tf.reduce_sum(self.z_batch**2, 1)
         
-        d_loss1_batch = -1*tf.log(prob)
-        d_loss2_batch = tf.log(1-prob)
+        d_loss1_batch = tf.reduce_mean(
+            tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(logit), logits=logit))
+        d_loss2_batch = -1*tf.reduce_mean(
+            tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(logit), logits=logit))
         ml2_w, ml1_w, zp_w, dl1_w, dl2_w =1, 0, 0.01, 0, 0
         # define total loss
         total_loss_batch = ml1_w * m_loss1_batch \
