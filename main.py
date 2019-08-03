@@ -32,6 +32,13 @@ flags.DEFINE_integer('print_every', 200, 'print every')
 flags.DEFINE_integer('save_every', 2000, 'print every')
 flags.DEFINE_string('load', 'none','load best last' )
 flags.DEFINE_string('exp_name', '', 'name of experiment')
+flags.DEFINE_float("lr_test", 0.1, "the init of learn rate")
+flags.DEFINE_float("ml1_w", 0, "the init of learn rate")
+flags.DEFINE_float("ml2_w", 1, "the init of learn rate")
+flags.DEFINE_float("dl1_w", 0, "the init of learn rate")
+flags.DEFINE_float("dl2_w", 0, "the init of learn rate")
+flags.DEFINE_float("zp_w", 0.001, "the init of learn rate")
+
 FLAGS = flags.FLAGS
 hparams = hparams_def.get_hparams(FLAGS)
 if __name__ == "__main__":
@@ -79,7 +86,7 @@ if __name__ == "__main__":
     # import pdb; pdb.set_trace()
     vaeGan = vaegan(batch_size= batch_size, max_iters= max_iters, repeat = data_repeat,
                       load_type = FLAGS.load, latent_dim= latent_dim, log_dir= root_log_dir , learnrate_init= learn_rate_init , mdevice=mdevice
-                      ,hparams = hparams,_lambda = [FLAGS.alpha,FLAGS.beta, FLAGS.gamma], data_ob= cb_ob, print_every= print_every, save_every = save_every, ckp_dir = vaegan_checkpoint_dir)
+                      ,hparams = hparams,_lambda = [FLAGS.alpha,FLAGS.beta, FLAGS.gamma], data_ob= cb_ob, print_every= print_every, save_every = save_every, ckp_dir = vaegan_checkpoint_dir, flags = FLAGS)
 
     if FLAGS.op == 0:
         vaeGan.build_model_vaegan()

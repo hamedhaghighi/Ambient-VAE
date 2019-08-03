@@ -24,7 +24,8 @@ class vaegan(object):
 
     #build model
     def __init__(self, batch_size, max_iters, repeat, load_type, latent_dim, log_dir, learnrate_init, mdevice, hparams, _lambda, data_ob, print_every,
-                 save_every, ckp_dir):
+                 save_every, ckp_dir, flags):
+        self.FLAGS = flags
         self.hparams = hparams
         self.mdevice = mdevice
         self.batch_size = batch_size
@@ -183,7 +184,7 @@ class vaegan(object):
             tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.ones_like(logit), logits=logit))
         d_loss2_batch = -1*tf.reduce_mean(
             tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.zeros_like(logit), logits=logit))
-        ml2_w, ml1_w, zp_w, dl1_w, dl2_w =1, 0, 0.01, 0, 0
+        ml2_w, ml1_w, zp_w, dl1_w, dl2_w = self.FLAGS.ml2_w, self.FLAGS.ml1_w, self.FLAGS.zp_w, self.FLAGS.dl1_w, self.FLAGS.dl2_w
         # define total loss
         total_loss_batch = ml1_w * m_loss1_batch \
             + ml2_w * m_loss2_batch \
@@ -360,7 +361,7 @@ class vaegan(object):
         self.saver = tf.train.Saver(var_list= g_vars)
         var_list = [self.z_batch]
         global_step = tf.Variable(0, trainable=False, name='global_step')
-        learning_rate = tf.constant(0.1)
+        learning_rate = tf.constant(self.FLAGS.lr_test)
         with tf.variable_scope(tf.get_variable_scope(), reuse=False):
             opt = tf.train.AdamOptimizer(learning_rate)
             update_op = opt.minimize(
