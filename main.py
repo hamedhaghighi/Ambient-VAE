@@ -66,7 +66,7 @@ if __name__ == "__main__":
             shutil.rmtree(vaegan_checkpoint_dir)
     if not os.path.isdir(root_log_dir):
         mkdir_p(root_log_dir)
-    if not os.path.isdir(root_log_dir + '/test_{}_{}_{}'.format(FLAGS.ml2_w, FLAGS.dl1_w,
+    if not os.path.isdir(root_log_dir + '/test_{}_{}_{}'.format(FLAGS.ml1_w, FLAGS.dl1_w,
                                                               FLAGS.zp_w)):
         mkdir_p(root_log_dir + '/test_{}_{}_{}'.format(FLAGS.ml1_w, FLAGS.dl1_w,
                                                               FLAGS.zp_w))
