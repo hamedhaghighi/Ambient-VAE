@@ -57,13 +57,12 @@ def center_crop(x, crop_h , crop_w=None, resize_w=64):
     i = int(round((w - crop_w)/2.))
     return resize(x[j:j+crop_h, i:i+crop_w],
                                [resize_w, resize_w])
-
-
+def compute_pnsr_ssim(x , y):
+    return compare_psnr(x, y), compare_ssim(x, y, multichannel=True)
 
 def save_images(images, size, image_path, measure_dict, titles):
     images = [merge(img , size) for img in images]
-    PSNR = compare_psnr(images[0] , images[2])
-    SSIM = compare_ssim(images[0], images[2], multichannel=True)
+    PSNR, SSIM = compute_pnsr_ssim(images[0], images[2])
     measure_dict['psnr'].append(PSNR)
     measure_dict['ssim'].append(SSIM)
     return imsave(images, size, image_path,measure_dict, titles)
@@ -139,49 +138,3 @@ class CelebA(object):
             else:
                 test_list += [name]
         return train_list, val_list, test_list
-# def read_image_list_file(category, is_test):
-#     end_num = 0
-#     if is_test == False:
-
-#         start_num = 4
-#         path = category + "celebA/"
-
-#     else:
-
-#         start_num = 4
-#         path = category + "celeba_test/"
-#         end_num = 1202
-
-#     list_image = []
-#     list_label = []
-
-#     lines = open(category + "list_attr_celeba.txt")
-#     li_num = 0
-#     for line in lines:
-
-#         if li_num < start_num:
-#             li_num += 1
-#             continue
-
-#         if li_num >= end_num and is_test == True:
-#             break
-
-#         flag = line.split('1 ', 41)[20]  # get the label for gender
-#         file_name = line.split(' ', 1)[0]
-
-#         # print flag
-#         if flag == ' ':
-
-#             list_label.append(1)
-
-#         else:
-
-#             list_label.append(0)
-
-#         list_image.append(path + file_name)
-
-#         li_num += 1
-
-#     lines.close()
-
-#     return list_image, list_label

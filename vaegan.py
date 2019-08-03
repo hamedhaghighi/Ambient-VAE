@@ -1,6 +1,6 @@
 import tensorflow as tf
 from ops import batch_normal, de_conv, conv2d, fully_connect, lrelu
-from utils import save_images, get_image, load_celebA, normalize, merge
+from utils import save_images, get_image, load_celebA, normalize, merge, compute_pnsr_ssim
 from utils import CelebA
 import numpy as np
 from commons import arch
@@ -14,7 +14,7 @@ from tensorflow.examples.tutorials.mnist import input_data
 import os
 import pdb
 import time
-
+import matplotlib.pyplot as plt
 TINY = 1e-8
 d_scale_factor = 0.25
 g_scale_factor = 1 - 0.75/2
@@ -23,10 +23,9 @@ g_scale_factor = 1 - 0.75/2
 class vaegan(object):
 
     #build model
-    def __init__(self, batch_size, max_iters, repeat, load_type, latent_dim, log_dir, learnrate_init, mdevice, hparams, _lambda, data_ob, print_every,
+    def __init__(self, batch_size, max_iters, repeat, load_type, latent_dim, log_dir, learnrate_init, mdevice, _lambda, data_ob, print_every,
                  save_every, ckp_dir, flags):
         self.FLAGS = flags
-        self.hparams = hparams
         self.mdevice = mdevice
         self.batch_size = batch_size
         self.max_iters = max_iters
@@ -45,9 +44,9 @@ class vaegan(object):
         self.gamma = _lambda[2]
         self.channel = 3
         self.output_size = 64
-        self.theta_ph = mdevice.get_theta_ph(hparams)
-        self.theta_ph_rec = mdevice.get_theta_ph(hparams)
-        self.theta_ph_xp = mdevice.get_theta_ph(hparams)
+        self.theta_ph = mdevice.get_theta_ph(flags)
+        self.theta_ph_rec = mdevice.get_theta_ph(flags)
+        self.theta_ph_xp = mdevice.get_theta_ph(flags)
         self.images = tf.placeholder(tf.float32, shape=[
                                      None, self.output_size, self.output_size, self.channel], name="Inputs")
         self.best_loss = np.inf
@@ -78,25 +77,31 @@ class vaegan(object):
     def build_model_vaegan(self):
 
         self.x_lossy = arch.get_lossy(
-            self.hparams, self.mdevice, self.images, self.theta_ph)
+            self.FLAGS, self.mdevice, self.images, self.theta_ph)
 
         self.z_mean, self.z_sigm = self.Encode(self.x_lossy)
         self.z_x = tf.add(self.z_mean, tf.sqrt(tf.exp(self.z_sigm))*self.ep)
         self.x_tilde = self.generate(self.z_x, reuse=False)
-
-        self.x_tilde_lossy = arch.get_lossy(
-            self.hparams, self.mdevice, self.x_tilde, self.theta_ph_rec)
+        if self.FLAGS.supervised:
+            self.x_tilde_lossy = self.x_tilde
+        else:
+            self.x_tilde_lossy = arch.get_lossy(
+                self.FLAGS, self.mdevice, self.x_tilde, self.theta_ph_rec)
 
         self.l_x_tilde, self.De_pro_tilde = self.discriminate(
             self.x_tilde_lossy)
         # self.l_x_tilde, _ = self.discriminate(self.x_tilde, True)
 
         self.x_p = self.generate(self.zp, reuse=True)
+        if self.FLAGS.supervised:
+            self.x_p_lossy = self.x_p
+        else:
+            self.x_p_lossy = arch.get_lossy(
+                self.FLAGS, self.mdevice, self.x_p, self.theta_ph_xp)
+            
 
-        self.x_p_lossy = arch.get_lossy(
-            self.hparams, self.mdevice, self.x_p, self.theta_ph_xp)
-
-        self.l_x,  self.D_pro_logits = self.discriminate(self.x_lossy, True)
+        self.l_x,  self.D_pro_logits = self.discriminate(self.x_lossy 
+        if not self.FLAGS.supervised else self.images, True)
         _, self.G_pro_logits = self.discriminate(self.x_p_lossy, True)
 
         #KL loss
@@ -123,9 +128,11 @@ class vaegan(object):
         self.PL_loss = tf.reduce_mean(tf.reduce_sum(
             self.NLLNormal(self.l_x_tilde, self.l_x), [1, 2, 3])) / (4 * 4 * 256)
         L2_loss_1 = tf.reduce_mean(tf.reduce_sum(
-            self.NLLNormal(self.x_tilde, self.x_lossy), [1, 2, 3])) / (64 * 64 * 3)
+            self.NLLNormal(self.x_tilde, self.x_lossy 
+            if not self.FLAGS.supervised else self.images), [1, 2, 3])) / (64 * 64 * 3)
         L2_loss_2 = tf.reduce_mean(tf.reduce_sum(
-            self.NLLNormal(self.x_tilde_lossy, self.x_lossy), [1, 2, 3])) / (64 * 64 * 3)
+            self.NLLNormal(self.x_tilde_lossy, self.x_lossy 
+            if not self.FLAGS.supervised else self.images), [1, 2, 3])) / (64 * 64 * 3)
         self.L2_loss = L2_loss_1 if self.gamma == 0 else L2_loss_2
         #For encode
         # - self.LL_loss / (4 * 4 * 64)
@@ -170,10 +177,10 @@ class vaegan(object):
     def build_model_vaegan_test(self):
 
         self.x_lossy = arch.get_lossy(
-            self.hparams, self.mdevice, self.images, self.theta_ph)
+            self.FLAGS, self.mdevice, self.images, self.theta_ph)
         self.z_batch = tf.Variable(tf.random_normal([self.batch_size, 128]), name='z_batch')
         self.x_p = self.generate(self.z_batch)
-        self.x_p_lossy = arch.get_lossy(self.hparams, self.mdevice, self.x_p, self.theta_ph_xp)
+        self.x_p_lossy = arch.get_lossy(self.FLAGS, self.mdevice, self.x_p, self.theta_ph_xp)
         self.lp_lossy, logit = self.discriminate(self.x_p_lossy)
         self.lp, _ = self.discriminate(self.x_lossy, reuse=True)
         # define all losses
@@ -276,11 +283,11 @@ class vaegan(object):
                 next_x_images = sess.run(self.next_x)
 
                 theta_val = self.mdevice.sample_theta(
-                    self.hparams, self.batch_size)
+                    self.FLAGS, self.batch_size)
                 theta_val_rec = self.mdevice.sample_theta(
-                    self.hparams, self.batch_size)
+                    self.FLAGS, self.batch_size)
                 theta_val_xp = self.mdevice.sample_theta(
-                    self.hparams, self.batch_size)
+                    self.FLAGS, self.batch_size)
                 # next_x_images = sess.run(self.next_x)
                 # next_x_images = np.reshape(next_x_images,[-1,28,28,1])
                 fd = {self.images: next_x_images, self.theta_ph: theta_val,
@@ -327,11 +334,11 @@ class vaegan(object):
                     # score_list.append(inception_score)
                     # summary_str = sess.run(self.summ[0], feed_dict=fd_test)
                     # summary_str = sess.run(summary_op1)
-                    if self.hparams.measurement_type == "blur_addnoise":
+                    if self.FLAGS.measurement_type == "blur_addnoise":
                         lossy_images = normalize(lossy_images)
-                    if self.hparams.measurement_type == "drop_independent":
+                    if self.FLAGS.measurement_type == "drop_independent":
                         lossy_images = lossy_images * \
-                            (1-self.hparams.drop_prob)
+                            (1-self.FLAGS.drop_prob)
                     # summary_writer_test.add_summary(summary_str, step)
                     sample_images = [test_images[0:self.batch_size], lossy_images[0:self.batch_size], rec_images[0:self.batch_size],
                                      generated_image[0:self.batch_size]]
@@ -387,7 +394,7 @@ class vaegan(object):
                     self.best_loss = np.load(self.ckp_dir + '/' + 'best_loss.npy')
                     print('model restored')
             test_images = sess.run(self.next_x_val)
-            theta_val = self.mdevice.sample_theta(self.hparams, self.batch_size)
+            theta_val = self.mdevice.sample_theta(self.FLAGS, self.batch_size)
             # sess.run(self.opt_reinit_op)
             
             measure_dict = {
@@ -396,7 +403,7 @@ class vaegan(object):
                 'ssim': []
             }
             for j in range(self.FLAGS.iter_test):
-                theta_val_xp = self.mdevice.sample_theta(self.hparams, self.batch_size)
+                theta_val_xp = self.mdevice.sample_theta(self.FLAGS, self.batch_size)
                 feed_dict = {self.images: test_images, self.theta_ph: theta_val,self.theta_ph_xp: theta_val_xp}
                 _, lr_val, total_loss_val, \
                     m_loss1_val, \
@@ -420,13 +427,31 @@ class vaegan(object):
                     titles = ['orig', 'lossy', 'reconstructed']
                     
                     images = sess.run([self.images,self.x_lossy,self.x_p], feed_dict = feed_dict)
-                    if self.hparams.measurement_type == "drop_independent":
-                            images[1] = images[1] * (1-self.hparams.drop_prob)
+                    images[1] = np.clip(images[1], -1, 1)
                     measure_dict['recon_loss'].append(((images[0] - images[2])**2).mean())
                     save_images(images, [8, 8], '{}/test_{}_{}_{}/{:02d}_images.png'.format(self.log_dir, self.ml1_w, self.dl1_w,
                     self.zp_w , j), measure_dict, titles)
-                    # self.mdevice.unmeasure_np(hparams, x_measured_val, theta_val)
-
+            measure_dict = {
+                'recon_loss': [],
+                'psnr': [],
+                'ssim': []
+            }
+            fd = {self.images:test_images, self.theta_ph: theta_val}
+            x_lossy = sess.run(self.x_lossy, feed_dict=fd)
+            x_rec = self.mdevice.unmeasure_np(self.FLAGS, x_lossy , theta_val)
+            x_rec = np.clip(x_rec, -1 , 1)
+            
+            images = merge(test_images,[8, 8])
+            x_rec = merge(x_rec, [8, 8])
+            
+            psnr, ssim = compute_pnsr_ssim(images, x_rec)
+            fig = plt.figure()
+            plt.imshow(x_rec)
+            plt.text(0, 0, 'psnr:{:.2f}'.format(psnr), color = 'red')
+            plt.text(0, 10, 'ssim:{:.2f}'.format(ssim), color= 'red')
+            fig.savefig('{}/test_{}_{}_{}/blur_images.png'.format(self.log_dir, self.ml1_w, self.dl1_w,
+                                                                    self.zp_w), format='png')
+            plt.close()
     def discriminate(self, x_var, reuse=False):
 
         with tf.variable_scope("discriminator") as scope:

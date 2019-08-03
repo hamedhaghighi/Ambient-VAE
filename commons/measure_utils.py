@@ -90,9 +90,9 @@ def get_inpaint_func_tv():
                 inpainted[:, :, c] = image_c
             else:
                 h, w = image_c.shape
-                inpainted_c_var = cvxpy.Variable(h, w)
+                inpainted_c_var = cvxpy.Variable(shape = (h, w))
                 obj = cvxpy.Minimize(cvxpy.tv(inpainted_c_var))
-                constraints = [cvxpy.mul_elemwise(mask_c, inpainted_c_var) == cvxpy.mul_elemwise(mask_c, image_c)]
+                constraints = [cvxpy.multiply(mask_c, inpainted_c_var) == cvxpy.multiply(mask_c, image_c)]
                 prob = cvxpy.Problem(obj, constraints)
                 # prob.solve(solver=cvxpy.SCS, max_iters=100, eps=1e-2)  # scs solver
                 prob.solve()  # default solver

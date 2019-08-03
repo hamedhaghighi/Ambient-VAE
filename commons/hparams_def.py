@@ -18,7 +18,7 @@ def get_hparams(args=None):
 
         # mode
         train_mode='ambient',  # ambient, unmeasure, or baseline
-        unmeasure_type='medfilt',
+        unmeasure_type='blur',
 
         # model
         model_class='unconditional',

@@ -27,25 +27,10 @@ def setup_vals(hparams):
     elif hparams.dataset == 'celebA':
         hparams.c_dim = 3
         hparams.image_dims = [64, 64, 3]
-        hparams.train_size = 180000
-        hparams.x_min = -1
-        hparams.x_max = 1
         hparams.signal_power = 0.2885201  # Assuming each pixel in [-1, 1]
-    # elif hparams.dataset == 'cifar10':
-    #     hparams.c_dim = 3
-    #     hparams.image_dims = [32, 32, 3]
-    #     hparams.train_size = 50000
-    #     hparams.y_dim = 10  # [Optional] Number of labels
+
     else:
         raise NotImplementedError
-
-    expt_dir = dir_def.get_expt_dir(hparams)
-    hparams.hparams_dir = hparams.results_dir + 'hparams/' + expt_dir
-    hparams.summary_dir = hparams.results_dir + 'summ/'    + expt_dir
-    hparams.sample_dir  = hparams.results_dir + 'samples/' + expt_dir
-    hparams.ckpt_dir    = hparams.results_dir + 'ckpt/'    + expt_dir
-    hparams.incpt_dir   = hparams.results_dir + 'incpt/'   + expt_dir
-    hparams.incpt_pkl   = hparams.incpt_dir + 'score.pkl'
 
 
 def setup_dirs(hparams):
