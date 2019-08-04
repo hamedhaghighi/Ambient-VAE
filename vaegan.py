@@ -15,6 +15,8 @@ import os
 import pdb
 import time
 import matplotlib.pyplot as plt
+from model import Model
+from dataloader import Dataloader
 TINY = 1e-8
 d_scale_factor = 0.25
 g_scale_factor = 1 - 0.75/2
@@ -54,55 +56,43 @@ class vaegan(object):
         # self.images = tf.placeholder(tf.float32, [self.batch_size, self.output_size, self.output_size, self.channel])
         self.ep = tf.random_normal(shape=[self.batch_size, self.latent_dim])
         self.zp = tf.random_normal(shape=[self.batch_size, self.latent_dim])
-        self.next_x, self.training_init_op = self.make_dataset(
+        self.dataset = Dataloader(self.repeat_num, self.batch_size, self.output_size)
+        self.next_x, self.training_init_op = self.dataset.make_dataset(
             data_ob.train_data_list)
-        self.next_x_val, self.val_init_op = self.make_dataset(
+        self.next_x_val, self.val_init_op = self.dataset.make_dataset(
             data_ob.val_data_list)
-
-    def make_dataset(self, data_list):
-        dataset = tf.data.Dataset.from_tensor_slices(
-            convert_to_tensor(data_list, dtype=tf.string))
-        dataset = dataset.map(lambda filename: tuple(tf.py_func(self._read_by_function,
-                                                                [filename], [tf.double])), num_parallel_calls=16)
-        dataset = dataset.repeat(self.repeat_num)
-        dataset = dataset.apply(
-            tf.contrib.data.batch_and_drop_remainder(self.batch_size))
-
-        iterator = tf.data.Iterator.from_structure(
-            dataset.output_types, dataset.output_shapes)
-        next_x = tf.squeeze(iterator.get_next())
-        init_op = iterator.make_initializer(dataset)
-        return next_x, init_op
+        self.M = Model(self.batch_size)
+        
+    
 
     def build_model_vaegan(self):
 
         self.x_lossy = arch.get_lossy(
             self.FLAGS, self.mdevice, self.images, self.theta_ph)
 
-        self.z_mean, self.z_sigm = self.Encode(self.x_lossy)
+        self.z_mean, self.z_sigm = self.M.Encode(self.x_lossy)
         self.z_x = tf.add(self.z_mean, tf.sqrt(tf.exp(self.z_sigm))*self.ep)
-        self.x_tilde = self.generate(self.z_x, reuse=False)
+        self.x_tilde = self.M.generate(self.z_x, reuse=False)
         if self.FLAGS.supervised:
             self.x_tilde_lossy = self.x_tilde
         else:
             self.x_tilde_lossy = arch.get_lossy(
                 self.FLAGS, self.mdevice, self.x_tilde, self.theta_ph_rec)
 
-        self.l_x_tilde, self.De_pro_tilde = self.discriminate(
+        self.l_x_tilde, self.De_pro_tilde = self.M.discriminate(
             self.x_tilde_lossy)
         # self.l_x_tilde, _ = self.discriminate(self.x_tilde, True)
 
-        self.x_p = self.generate(self.zp, reuse=True)
+        self.x_p = self.M.generate(self.zp, reuse=True)
         if self.FLAGS.supervised:
             self.x_p_lossy = self.x_p
         else:
             self.x_p_lossy = arch.get_lossy(
                 self.FLAGS, self.mdevice, self.x_p, self.theta_ph_xp)
             
-
-        self.l_x,  self.D_pro_logits = self.discriminate(self.x_lossy 
-        if not self.FLAGS.supervised else self.images, True)
-        _, self.G_pro_logits = self.discriminate(self.x_p_lossy, True)
+        self.l_x,  self.D_pro_logits = self.M.discriminate(self.x_lossy
+                                                           if not self.FLAGS.supervised else self.images, True)
+        _, self.G_pro_logits = self.M.discriminate(self.x_p_lossy, True)
 
         #KL loss
         self.kl_loss = self.KL_loss(
@@ -179,10 +169,10 @@ class vaegan(object):
         self.x_lossy = arch.get_lossy(
             self.FLAGS, self.mdevice, self.images, self.theta_ph)
         self.z_batch = tf.Variable(tf.random_normal([self.batch_size, 128]), name='z_batch')
-        self.x_p = self.generate(self.z_batch)
+        self.x_p = self.M.generate(self.z_batch)
         self.x_p_lossy = arch.get_lossy(self.FLAGS, self.mdevice, self.x_p, self.theta_ph_xp)
-        self.lp_lossy, logit = self.discriminate(self.x_p_lossy)
-        self.lp, _ = self.discriminate(self.x_lossy, reuse=True)
+        self.lp_lossy, logit = self.M.discriminate(self.x_p_lossy)
+        self.lp, _ = self.M.discriminate(self.x_lossy, reuse=True)
         # define all losses
         m_loss1_batch = tf.reduce_mean((self.lp_lossy - self.lp)**2, (1, 2, 3))
         m_loss2_batch = tf.reduce_mean((self.x_lossy - self.x_p_lossy)**2, (1, 2, 3))
@@ -214,18 +204,17 @@ class vaegan(object):
         add_global = global_step.assign_add(1)
         new_learning_rate = tf.train.exponential_decay(self.learn_rate_init, global_step=global_step, decay_steps=10000,
                                                        decay_rate=0.98)
-        if not self.FLAGS.supervised:
-            #for D
-            trainer_D = tf.train.RMSPropOptimizer(learning_rate=new_learning_rate)
-            gradients_D = trainer_D.compute_gradients(
-                self.D_loss, var_list=self.d_vars)
-            opti_D = trainer_D.apply_gradients(gradients_D)
+        #for D
+        trainer_D = tf.train.RMSPropOptimizer(learning_rate=new_learning_rate)
+        gradients_D = trainer_D.compute_gradients(
+            self.D_loss, var_list=self.d_vars)
+        opti_D = trainer_D.apply_gradients(gradients_D)
 
-            #for G
-            trainer_G = tf.train.RMSPropOptimizer(learning_rate=new_learning_rate)
-            gradients_G = trainer_G.compute_gradients(
-                self.G_loss, var_list=self.g_vars)
-            opti_G = trainer_G.apply_gradients(gradients_G)
+        #for G
+        trainer_G = tf.train.RMSPropOptimizer(learning_rate=new_learning_rate)
+        gradients_G = trainer_G.compute_gradients(
+            self.G_loss, var_list=self.g_vars)
+        opti_G = trainer_G.apply_gradients(gradients_G)
 
         #for E
         trainer_E = tf.train.RMSPropOptimizer(learning_rate=new_learning_rate)
@@ -295,10 +284,10 @@ class vaegan(object):
                       self.theta_ph_rec: theta_val_rec, self.theta_ph_xp: theta_val_xp}
                 sess.run(opti_E, feed_dict=fd)
                 # optimizaiton G
-                if not self.FLAGS.supervised:
-                    sess.run(opti_G, feed_dict=fd)
-                    # optimization D
-                    sess.run(opti_D, feed_dict=fd)
+                
+                sess.run(opti_G, feed_dict=fd)
+                # optimization D
+                sess.run(opti_D, feed_dict=fd)
                     # lossy_images , generated_image = sess.run([self.x_lossy,self.x_p], feed_dict=fd)
 
                 if (step+1) % self.print_every == 0:
@@ -454,68 +443,6 @@ class vaegan(object):
             fig.savefig('{}/test_{}_{}_{}/blur_images.png'.format(self.log_dir, self.ml1_w, self.dl1_w,
                                                                     self.zp_w), format='png')
             plt.close()
-    def discriminate(self, x_var, reuse=False):
-
-        with tf.variable_scope("discriminator") as scope:
-
-            if reuse:
-                scope.reuse_variables()
-
-            conv1 = tf.nn.relu(conv2d(x_var, output_dim=32, name='dis_conv1'))
-            conv2 = tf.nn.relu(batch_normal(
-                conv2d(conv1, output_dim=128, name='dis_conv2'), scope='dis_bn1', reuse=reuse))
-            conv3 = tf.nn.relu(batch_normal(
-                conv2d(conv2, output_dim=256, name='dis_conv3'), scope='dis_bn2', reuse=reuse))
-            conv4 = conv2d(conv3, output_dim=256, name='dis_conv4')
-            middle_conv = conv4
-            conv4 = tf.nn.relu(batch_normal(
-                conv4, scope='dis_bn3', reuse=reuse))
-            conv4 = tf.reshape(conv4, [self.batch_size, -1])
-
-            fl = tf.nn.relu(batch_normal(fully_connect(
-                conv4, output_size=256, scope='dis_fully1'), scope='dis_bn4', reuse=reuse))
-            output = fully_connect(fl, output_size=1, scope='dis_fully2')
-
-            return middle_conv, output
-
-    def generate(self, z_var, reuse=False):
-
-        with tf.variable_scope('generator') as scope:
-
-            if reuse == True:
-                scope.reuse_variables()
-
-            d1 = tf.nn.relu(batch_normal(fully_connect(
-                z_var, output_size=8*8*256, scope='gen_fully1'), scope='gen_bn1', reuse=reuse))
-            d2 = tf.reshape(d1, [self.batch_size, 8, 8, 256])
-            d2 = tf.nn.relu(batch_normal(de_conv(d2, output_shape=[
-                            self.batch_size, 16, 16, 256], name='gen_deconv2'), scope='gen_bn2', reuse=reuse))
-            d3 = tf.nn.relu(batch_normal(de_conv(d2, output_shape=[
-                            self.batch_size, 32, 32, 128], name='gen_deconv3'), scope='gen_bn3', reuse=reuse))
-            d4 = tf.nn.relu(batch_normal(de_conv(d3, output_shape=[
-                            self.batch_size, 64, 64, 32], name='gen_deconv4'), scope='gen_bn4', reuse=reuse))
-            d5 = de_conv(d4, output_shape=[
-                         self.batch_size, 64, 64, 3], name='gen_deconv5', d_h=1, d_w=1)
-
-            return tf.nn.tanh(d5)
-
-    def Encode(self, x):
-
-        with tf.variable_scope('encode') as scope:
-
-            conv1 = tf.nn.relu(batch_normal(
-                conv2d(x, output_dim=64, name='e_c1'), scope='e_bn1'))
-            conv2 = tf.nn.relu(batch_normal(
-                conv2d(conv1, output_dim=128, name='e_c2'), scope='e_bn2'))
-            conv3 = tf.nn.relu(batch_normal(
-                conv2d(conv2, output_dim=256, name='e_c3'), scope='e_bn3'))
-            conv3 = tf.reshape(conv3, [self.batch_size, 256 * 8 * 8])
-            fc1 = tf.nn.relu(batch_normal(fully_connect(
-                conv3, output_size=1024, scope='e_f1'), scope='e_bn4'))
-            z_mean = fully_connect(fc1, output_size=128, scope='e_f2')
-            z_sigma = fully_connect(fc1, output_size=128, scope='e_f3')
-
-            return z_mean, z_sigma
 
     def KL_loss(self, mu, log_var):
         return -0.5 * tf.reduce_sum(1 + log_var - tf.pow(mu, 2) - tf.exp(log_var))
@@ -534,20 +461,4 @@ class vaegan(object):
 
         return tmp
 
-    def _parse_function(self, images_filenames):
-
-        image_string = tf.read_file(images_filenames)
-        image_decoded = tf.image.decode_and_crop_jpeg(
-            image_string, crop_window=[218 / 2 - 54, 178 / 2 - 54, 108, 108], channels=3)
-        image_resized = tf.image.resize_images(
-            image_decoded, [self.output_size, self.output_size])
-        image_resized = image_resized / 127.5 - 1
-
-        return image_resized
-
-    def _read_by_function(self, filename):
-
-        array = get_image(filename, 108, is_crop=True, resize_w=self.output_size,
-                          is_grayscale=False)
-        real_images = np.array(array)
-        return real_images
+    
