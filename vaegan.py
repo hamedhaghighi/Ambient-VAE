@@ -175,7 +175,7 @@ class vaegan(object):
         self.lp, _ = self.M.discriminate(self.x_lossy, reuse=True)
         # define all losses
         m_loss1_batch = tf.reduce_mean((self.lp_lossy - self.lp)**2, (1, 2, 3))
-        m_loss2_batch = tf.reduce_mean((self.x_lossy - self.x_p_lossy)**2, (1, 2, 3))
+        m_loss2_batch = tf.reduce_mean((self.x_lossy - self.x_p)**2, (1, 2, 3))
         zp_loss_batch = tf.reduce_sum(self.z_batch**2, 1)
         
         d_loss1_batch = tf.reduce_mean(
