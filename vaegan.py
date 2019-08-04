@@ -295,10 +295,11 @@ class vaegan(object):
                       self.theta_ph_rec: theta_val_rec, self.theta_ph_xp: theta_val_xp}
                 sess.run(opti_E, feed_dict=fd)
                 # optimizaiton G
-                sess.run(opti_G, feed_dict=fd)
-                # optimization D
-                sess.run(opti_D, feed_dict=fd)
-                # lossy_images , generated_image = sess.run([self.x_lossy,self.x_p], feed_dict=fd)
+                if not self.FLAGS.supervised:
+                    sess.run(opti_G, feed_dict=fd)
+                    # optimization D
+                    sess.run(opti_D, feed_dict=fd)
+                    # lossy_images , generated_image = sess.run([self.x_lossy,self.x_p], feed_dict=fd)
 
                 if (step+1) % self.print_every == 0:
 
