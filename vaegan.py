@@ -230,7 +230,7 @@ class vaegan(object):
         #for E
         trainer_E = tf.train.RMSPropOptimizer(learning_rate=new_learning_rate)
         gradients_E = trainer_E.compute_gradients(
-            self.encode_loss, var_list=self.e_vars + (self.d_vars if self.FLAGS.supervised else []) )
+            self.encode_loss, var_list=self.e_vars + (self.g_vars if self.FLAGS.supervised else []) )
         opti_E = trainer_E.apply_gradients(gradients_E)
 
         init = tf.global_variables_initializer()
