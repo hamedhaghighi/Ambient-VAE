@@ -214,17 +214,18 @@ class vaegan(object):
         add_global = global_step.assign_add(1)
         new_learning_rate = tf.train.exponential_decay(self.learn_rate_init, global_step=global_step, decay_steps=10000,
                                                        decay_rate=0.98)
-        #for D
-        trainer_D = tf.train.RMSPropOptimizer(learning_rate=new_learning_rate)
-        gradients_D = trainer_D.compute_gradients(
-            self.D_loss, var_list=self.d_vars)
-        opti_D = trainer_D.apply_gradients(gradients_D)
+        if not self.FLAGS.supervised:
+            #for D
+            trainer_D = tf.train.RMSPropOptimizer(learning_rate=new_learning_rate)
+            gradients_D = trainer_D.compute_gradients(
+                self.D_loss, var_list=self.d_vars)
+            opti_D = trainer_D.apply_gradients(gradients_D)
 
-        #for G
-        trainer_G = tf.train.RMSPropOptimizer(learning_rate=new_learning_rate)
-        gradients_G = trainer_G.compute_gradients(
-            self.G_loss, var_list=self.g_vars)
-        opti_G = trainer_G.apply_gradients(gradients_G)
+            #for G
+            trainer_G = tf.train.RMSPropOptimizer(learning_rate=new_learning_rate)
+            gradients_G = trainer_G.compute_gradients(
+                self.G_loss, var_list=self.g_vars)
+            opti_G = trainer_G.apply_gradients(gradients_G)
 
         #for E
         trainer_E = tf.train.RMSPropOptimizer(learning_rate=new_learning_rate)
