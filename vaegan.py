@@ -341,7 +341,7 @@ class vaegan(object):
                 if (step+1) % self.save_every == 0:
                     self.saver.save(sess, self.ckp_dir + '/last.ckpt',global_step=global_step, latest_filename='last')                                 
                     print("Model saved in file: %s" % self.ckp_dir)
-                if (step+1)% (self.save_every//2) == 0:
+                if (step+1)% (self.save_every//4) == 0:
                     if rc < self.best_loss:
                         self.best_loss = rc
                         np.save(self.ckp_dir + '/' + 'best_loss.npy', self.best_loss)
