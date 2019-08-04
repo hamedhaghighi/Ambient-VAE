@@ -65,5 +65,8 @@ if __name__ == "__main__":
         vaeGan.train()
 
     else:
-        vaeGan.build_model_vaegan_test()
-        vaeGan.test()
+        if FLAGS.exp_name_test == 'iterative':
+            vaeGan.build_model_vaegan_test()
+        else:
+            vaeGan.build_model_vaegan()
+        vaeGan.test(FLAGS.exp_name_test)

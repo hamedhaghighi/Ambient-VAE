@@ -63,7 +63,7 @@ class vaegan(object):
             data_ob.val_data_list)
         self.M = Model(self.batch_size)
         
-    
+        np.random.seed(1)
 
     def build_model_vaegan(self):
 
@@ -284,7 +284,7 @@ class vaegan(object):
                       self.theta_ph_rec: theta_val_rec, self.theta_ph_xp: theta_val_xp}
                 sess.run(opti_E, feed_dict=fd)
                 # optimizaiton G
-                
+
                 sess.run(opti_G, feed_dict=fd)
                 # optimization D
                 sess.run(opti_D, feed_dict=fd)
@@ -353,18 +353,23 @@ class vaegan(object):
                 if new_learn_rate > 0.00005:
                     sess.run(add_global)
 
-    def test(self):
-        # Set up gradient descent
-        t_vars = tf.trainable_variables()
-        g_vars = [var for var in t_vars if ('gen' in var.name) or ('dis' in var.name)]
-        self.saver = tf.train.Saver(var_list= g_vars)
-        var_list = [self.z_batch]
-        global_step = tf.Variable(0, trainable=False, name='global_step')
-        learning_rate = tf.constant(self.FLAGS.lr_test)
-        with tf.variable_scope(tf.get_variable_scope(), reuse=False):
-            opt = tf.train.AdamOptimizer(learning_rate)
-            update_op = opt.minimize(
-                self.total_loss, var_list=var_list, global_step=global_step, name='update_op')
+    def test(self, exp_name):
+    
+        if exp_name == 'iterative':
+            # Set up gradient descent
+            t_vars = tf.trainable_variables()
+            g_vars = [var for var in t_vars if ('gen' in var.name) or ('dis' in var.name)]
+            
+            var_list = [self.z_batch]
+            global_step = tf.Variable(0, trainable=False, name='global_step')
+            learning_rate = tf.constant(self.FLAGS.lr_test)
+            with tf.variable_scope(tf.get_variable_scope(), reuse=False):
+                opt = tf.train.AdamOptimizer(learning_rate)
+                update_op = opt.minimize(
+                    self.total_loss, var_list=var_list, global_step=global_step, name='update_op')
+
+        self.saver = tf.train.Saver(
+            var_list=g_vars) if exp_name == 'iterative' else tf.train.Saver()
         # self.opt_reinit_op = self.get_opt_reinit_op(opt, var_list, global_step)
         init = tf.global_variables_initializer()
         config = tf.ConfigProto()
@@ -388,61 +393,84 @@ class vaegan(object):
             theta_val = self.mdevice.sample_theta(self.FLAGS, self.batch_size)
             # sess.run(self.opt_reinit_op)
             
-            measure_dict = {
+            if exp_name == 'iterative':
+                img2save= self.estimate(sess, learning_rate,
+                            update_op, test_images, theta_val)
+            elif exp_name == 'normal' or exp_name == 'supervised':
+                feed_dict = {self.images: test_images,
+                                self.theta_ph: theta_val}
+                img2save = sess.run(self.x_tilde, feed_dict=feed_dict)
+            else:
+                img2save = self.get_unmeasure_pic(sess, test_images, theta_val)
+            lossy = sess.run(self.x_lossy, feed_dict= {self.images: test_images, self.theta_ph: theta_val})
+        lossy = np.clip(lossy, -1, 1)
+        img2save = merge(img2save, [8,8])
+        lossy = merge(lossy, [8, 8])
+        test_images = merge(test_images, [8, 8])
+        psnr, ssim = compute_pnsr_ssim(test_images, img2save)
+        print ('psnr:{:.2f}, ssim:{:.2f}'.format(psnr, ssim))
+        io.imsave('{}/{}.png'.format(self.log_dir,exp_name), img2save[:64])
+        io.imsave('{}/orig.png'.format(self.log_dir), test_images[:64])
+        io.imsave('{}/lossy.png'.format(self.log_dir), lossy[:64])
+
+
+    def estimate(self ,sess, learning_rate, update_op,test_images, theta_val):
+        measure_dict = {
+            'recon_loss': [],
+            'psnr': [],
+            'ssim': []
+        }
+        for j in range(self.FLAGS.iter_test):
+            theta_val_xp = self.mdevice.sample_theta(
+                self.FLAGS, self.batch_size)
+            feed_dict = {self.images: test_images,
+                            self.theta_ph: theta_val, self.theta_ph_xp: theta_val_xp}
+            _, lr_val, total_loss_val, \
+                m_loss1_val, \
+                m_loss2_val, \
+                zp_loss_val, \
+                d_loss1_val, \
+                d_loss2_val = sess.run([update_op, learning_rate, self.total_loss,
+                                        self.m_loss1,
+                                        self.m_loss2,
+                                        self.zp_loss,
+                                        self.d_loss1,
+                                        self.d_loss2], feed_dict=feed_dict)
+            logging_format = 'rr {} iter {} lr {:.3f} total_loss {:.3f} m_loss1 {:.3f} m_loss2 {:.3f} zp_loss {:.3f} d_loss1 {:.3f} d_loss2 {:.3f}'
+            print(logging_format.format(1, j, lr_val, total_loss_val,
+                                        m_loss1_val,
+                                        m_loss2_val,
+                                        zp_loss_val,
+                                        d_loss1_val,
+                                        d_loss2_val))
+            if j % 10 == 0:
+                titles = ['orig', 'lossy', 'reconstructed']
+                images = sess.run(
+                    [self.images, self.x_lossy, self.x_p], feed_dict=feed_dict)
+                images[1] = np.clip(images[1], -1, 1)
+                measure_dict['recon_loss'].append(
+                    ((images[0] - images[2])**2).mean())
+                save_images(images, [8, 8], '{}/test_{}_{}_{}/{}_images.png'.format(self.log_dir, self.ml1_w, self.dl1_w,
+                                                                                                self.zp_w, j), measure_dict, titles)
+        return images[2]
+
+    def get_unmeasure_pic(self,sess, test_images, theta_val):
+
+        measure_dict = {
                 'recon_loss': [],
                 'psnr': [],
                 'ssim': []
-            }
-            for j in range(self.FLAGS.iter_test):
-                theta_val_xp = self.mdevice.sample_theta(self.FLAGS, self.batch_size)
-                feed_dict = {self.images: test_images, self.theta_ph: theta_val,self.theta_ph_xp: theta_val_xp}
-                _, lr_val, total_loss_val, \
-                    m_loss1_val, \
-                    m_loss2_val, \
-                    zp_loss_val, \
-                    d_loss1_val, \
-                    d_loss2_val = sess.run([update_op, learning_rate, self.total_loss,
-                                            self.m_loss1,
-                                            self.m_loss2,
-                                            self.zp_loss,
-                                            self.d_loss1,
-                                            self.d_loss2], feed_dict=feed_dict)
-                logging_format = 'rr {} iter {} lr {:.3f} total_loss {:.3f} m_loss1 {:.3f} m_loss2 {:.3f} zp_loss {:.3f} d_loss1 {:.3f} d_loss2 {:.3f}'
-                print (logging_format.format(1, j, lr_val, total_loss_val,
-                                            m_loss1_val,
-                                            m_loss2_val,
-                                            zp_loss_val,
-                                            d_loss1_val,
-                                            d_loss2_val))
-                if j % 10 == 0:
-                    titles = ['orig', 'lossy', 'reconstructed']
-                    
-                    images = sess.run([self.images,self.x_lossy,self.x_p], feed_dict = feed_dict)
-                    images[1] = np.clip(images[1], -1, 1)
-                    measure_dict['recon_loss'].append(((images[0] - images[2])**2).mean())
-                    save_images(images, [8, 8], '{}/test_{}_{}_{}/{:02d}_images.png'.format(self.log_dir, self.ml1_w, self.dl1_w,
-                    self.zp_w , j), measure_dict, titles)
-            measure_dict = {
-                'recon_loss': [],
-                'psnr': [],
-                'ssim': []
-            }
-            fd = {self.images:test_images, self.theta_ph: theta_val}
-            x_lossy = sess.run(self.x_lossy, feed_dict=fd)
-            x_rec = self.mdevice.unmeasure_np(self.FLAGS, x_lossy , theta_val)
-            x_rec = np.clip(x_rec, -1 , 1)
-            
-            images = merge(test_images,[8, 8])
-            x_rec = merge(x_rec, [8, 8])
-            
-            psnr, ssim = compute_pnsr_ssim(images, x_rec)
-            fig = plt.figure()
-            plt.imshow(x_rec)
-            plt.text(0, 0, 'psnr:{:.2f}'.format(psnr), color = 'red')
-            plt.text(0, 10, 'ssim:{:.2f}'.format(ssim), color= 'red')
-            fig.savefig('{}/test_{}_{}_{}/blur_images.png'.format(self.log_dir, self.ml1_w, self.dl1_w,
-                                                                    self.zp_w), format='png')
-            plt.close()
+        }
+        fd = {self.images:test_images, self.theta_ph: theta_val}
+        x_lossy = sess.run(self.x_lossy, feed_dict=fd)
+        x_rec = self.mdevice.unmeasure_np(self.FLAGS, x_lossy , theta_val)
+        x_rec = np.clip(x_rec, -1 , 1)
+        
+        images = merge(test_images,[8, 8])
+        x_rec_merge = merge(x_rec, [8, 8])
+        psnr, ssim = compute_pnsr_ssim(images, x_rec_merge)
+        return x_rec
+
 
     def KL_loss(self, mu, log_var):
         return -0.5 * tf.reduce_sum(1 + log_var - tf.pow(mu, 2) - tf.exp(log_var))
