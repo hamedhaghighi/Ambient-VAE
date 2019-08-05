@@ -259,7 +259,7 @@ class BlurAddNoise(MeasurementDevice):
 
     def measure(self, hparams, x, theta_ph):
         x_blurred = x
-        x_blurred = measure_utils.blur(hparams, x)
+        # x_blurred = measure_utils.blur(hparams, x)
         x_measured = tf.add(x_blurred, theta_ph, name='x_measured')
         # x_measured = x_blurred
         return x_measured
