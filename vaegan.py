@@ -133,9 +133,8 @@ class vaegan(object):
         #for Gen
         # - 1e-6*self.LL_loss
         #+ self.G_tilde_loss
-        self.G_loss = self.G_fake_loss + self.G_tilde_loss - 1e-6*self.L_loss
+        self.G_loss = self.G_fake_loss + self.G_tilde_loss - self.FLAGS.l2_w*(self.L2_loss + self.PL_loss)
         self.recon_loss = tf.reduce_mean(tf.square(self.images - self.x_tilde))
-        # self.recon_loss = tf.reduce_mean(tf.square(self.x_lossy - self.x_tilde))
         self.log_vars.append(("recon_loss", self.recon_loss))
         self.log_vars.append(("encode_loss", self.encode_loss))
         self.log_vars.append(("generator_loss", self.G_loss))
