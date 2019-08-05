@@ -124,16 +124,16 @@ class vaegan(object):
             self.NLLNormal(self.x_tilde_lossy, self.x_lossy 
             if not self.FLAGS.supervised else self.images), [1, 2, 3])) / (64 * 64 * 3)
         self.L2_loss = L2_loss_1 if self.gamma == 0 else L2_loss_2
+        self.L_loss = self.alpha *self.L2_loss + self.beta * self.PL_loss
         #For encode
         # - self.LL_loss / (4 * 4 * 64)
         #self.kl_loss/(self.latent_dim*self.batch_size)-
-        self.encode_loss = self.kl_loss - self.alpha * \
-            self.L2_loss - self.beta * self.PL_loss
+        self.encode_loss = self.kl_loss - self.L_loss
 
         #for Gen
         # - 1e-6*self.LL_loss
         #+ self.G_tilde_loss
-        self.G_loss = self.G_fake_loss + self.G_tilde_loss
+        self.G_loss = self.G_fake_loss + self.G_tilde_loss - 1e-6*self.L_loss
         self.recon_loss = tf.reduce_mean(tf.square(self.images - self.x_tilde))
         # self.recon_loss = tf.reduce_mean(tf.square(self.x_lossy - self.x_tilde))
         self.log_vars.append(("recon_loss", self.recon_loss))
