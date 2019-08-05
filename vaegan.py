@@ -324,11 +324,7 @@ class vaegan(object):
                     # score_list.append(inception_score)
                     # summary_str = sess.run(self.summ[0], feed_dict=fd_test)
                     # summary_str = sess.run(summary_op1)
-                    if self.FLAGS.measurement_type == "blur_addnoise":
-                        lossy_images = normalize(lossy_images)
-                    if self.FLAGS.measurement_type == "drop_independent":
-                        lossy_images = lossy_images * \
-                            (1-self.FLAGS.drop_prob)
+                    lossy_images = np.clip(lossy_images, -1 , 1)
                     # summary_writer_test.add_summary(summary_str, step)
                     sample_images = [test_images[0:self.batch_size], lossy_images[0:self.batch_size], rec_images[0:self.batch_size],
                                      generated_image[0:self.batch_size]]
