@@ -58,7 +58,7 @@ if __name__ == "__main__":
     save_every = FLAGS.save_every
     learn_rate_init = FLAGS.lr
     
-    cb_ob = CelebA(FLAGS.path) if dataset == 'celebA' else None
+    cb_ob = CelebA(FLAGS.path) if FLAGS.dataset == 'celebA' else None
     # import pdb; pdb.set_trace()
     vaeGan = vaegan(batch_size= batch_size, max_iters= max_iters, repeat = data_repeat,
                       load_type = FLAGS.load, latent_dim= latent_dim, log_dir= root_log_dir , learnrate_init= learn_rate_init , mdevice=mdevice
