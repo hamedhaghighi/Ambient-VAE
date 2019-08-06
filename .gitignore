@@ -417,3 +417,4 @@ model_vaegan/
 
 results/
 .vscode/
+vaeganlogs_mnist/
