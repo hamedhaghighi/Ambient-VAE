@@ -11,6 +11,7 @@ flags.DEFINE_integer(
 flags.DEFINE_string("path", 'oem',
                     "for example, '/home/jack/data/' is the directory of your celebA data")
 flags.DEFINE_integer("op", 0, "Training or Test")
+flags.DEFINE_integer("seed", 1, "Training or Test")
 flags.DEFINE_string(
     'hparams', '', 'Comma separated list of "name=value" pairs.')
 flags.DEFINE_float('alpha', 10, 'lambda1')
