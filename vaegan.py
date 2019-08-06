@@ -389,7 +389,7 @@ class vaegan(object):
         test_images = merge(test_images, [8, 8], (self.FLAGS.x_min , self.FLAGS.x_max))
         psnr, ssim = compute_pnsr_ssim(test_images, img2save)
         print ('psnr:{:.2f}, ssim:{:.2f}'.format(psnr, ssim))
-        io.imsave('{}/{}.png'.format(self.log_dir,exp_name), img2save[:self.FLAGS.img_dims[0]])
+        io.imsave('{}/{}.png'.format(self.log_dir,exp_name), img2save[::self.output_size])
         io.imsave('{}/orig.png'.format(self.log_dir),
                   test_images[:self.output_size])
         io.imsave('{}/lossy.png'.format(self.log_dir), lossy[:self.output_size])
