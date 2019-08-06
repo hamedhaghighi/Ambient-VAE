@@ -122,14 +122,7 @@ class vaegan(object):
             if not self.FLAGS.supervised else self.images), [1, 2, 3]))
         self.L2_loss = L2_loss_1 if self.gamma == 0 else L2_loss_2
         self.L_loss = self.alpha *self.L2_loss + self.beta * self.PL_loss
-        #For encode
-        # - self.LL_loss / (4 * 4 * 64)
-        #self.kl_loss/(self.latent_dim*self.batch_size)-
         self.encode_loss = self.kl_loss - self.L_loss
-
-        #for Gen
-        # - 1e-6*self.LL_loss
-        #+ self.G_tilde_loss
         self.G_loss = self.G_fake_loss + self.G_tilde_loss - self.FLAGS.l2_w*self.L_loss
         self.recon_loss = tf.reduce_mean(tf.square(self.images - self.x_tilde))
         self.log_vars.append(("recon_loss", self.recon_loss))
@@ -396,9 +389,10 @@ class vaegan(object):
         test_images = merge(test_images, [8, 8], (self.FLAGS.x_min , self.FLAGS.x_max))
         psnr, ssim = compute_pnsr_ssim(test_images, img2save)
         print ('psnr:{:.2f}, ssim:{:.2f}'.format(psnr, ssim))
-        io.imsave('{}/{}.png'.format(self.log_dir,exp_name), img2save[:64])
-        io.imsave('{}/orig.png'.format(self.log_dir), test_images[:64])
-        io.imsave('{}/lossy.png'.format(self.log_dir), lossy[:64])
+        io.imsave('{}/{}.png'.format(self.log_dir,exp_name), img2save[:self.FLAGS.img_dims[0]])
+        io.imsave('{}/orig.png'.format(self.log_dir),
+                  test_images[:self.output_size])
+        io.imsave('{}/lossy.png'.format(self.log_dir), lossy[:self.output_size])
 
 
     def estimate(self ,sess, learning_rate, update_op,test_images, theta_val):
