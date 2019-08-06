@@ -44,8 +44,8 @@ class vaegan(object):
         self.alpha = _lambda[0]
         self.beta = _lambda[1]
         self.gamma = _lambda[2]
-        self.channel = 3
-        self.output_size = 64
+        self.channel = self.FLAGS.image_dims[2]
+        self.output_size = self.FLAGS.image_dims[0]
         self.theta_ph = mdevice.get_theta_ph(flags)
         self.theta_ph_rec = mdevice.get_theta_ph(flags)
         self.theta_ph_xp = mdevice.get_theta_ph(flags)
@@ -57,11 +57,8 @@ class vaegan(object):
         self.ep = tf.random_normal(shape=[self.batch_size, self.latent_dim])
         self.zp = tf.random_normal(shape=[self.batch_size, self.latent_dim])
         self.dataset = Dataloader(self.repeat_num, self.batch_size, self.output_size)
-        self.next_x, self.training_init_op = self.dataset.make_dataset(
-            data_ob.train_data_list)
-        self.next_x_val, self.val_init_op = self.dataset.make_dataset(
-            data_ob.val_data_list)
-        self.M = Model(self.batch_size)
+        self.training_init_op, self.val_init_op = self.dataset.make_dataset(data_ob , self.FLAGS.dataset)
+        self.M = Model(self.batch_size, self.FLAGS.dataset, self.FLAGS.latent_dim)
         
         np.random.seed(1)
 
@@ -115,14 +112,14 @@ class vaegan(object):
         self.D_loss = self.D_fake_loss + self.D_real_loss + self.D_tilde_loss
 
         # preceptual loss(feature loss)
-        self.PL_loss = tf.reduce_mean(tf.reduce_sum(
-            self.NLLNormal(self.l_x_tilde, self.l_x), [1, 2, 3])) / (4 * 4 * 256)
-        L2_loss_1 = tf.reduce_mean(tf.reduce_sum(
+        self.PL_loss = tf.reduce_mean(tf.reduce_mean(
+            self.NLLNormal(self.l_x_tilde, self.l_x), [1, 2, 3]))
+        L2_loss_1 = tf.reduce_mean(tf.reduce_mean(
             self.NLLNormal(self.x_tilde, self.x_lossy 
-            if not self.FLAGS.supervised else self.images), [1, 2, 3])) / (64 * 64 * 3)
-        L2_loss_2 = tf.reduce_mean(tf.reduce_sum(
+            if not self.FLAGS.supervised else self.images), [1, 2, 3]))
+        L2_loss_2 = tf.reduce_mean(tf.reduce_mean(
             self.NLLNormal(self.x_tilde_lossy, self.x_lossy 
-            if not self.FLAGS.supervised else self.images), [1, 2, 3])) / (64 * 64 * 3)
+            if not self.FLAGS.supervised else self.images), [1, 2, 3]))
         self.L2_loss = L2_loss_1 if self.gamma == 0 else L2_loss_2
         self.L_loss = self.alpha *self.L2_loss + self.beta * self.PL_loss
         #For encode
@@ -252,14 +249,8 @@ class vaegan(object):
                     print('model restored')
 
             step = global_step.eval()
-            # test_images = load_celebA(self.data_ob,self.batch_size)
-            test_images = sess.run(self.next_x_val)
-            # mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
-            # n_samples = mnist.train.num_examples
-            # n_batches = n_samples//self.batch_size
-            # test_images =_load_mnist(self.batch_size)
-            # test_images = mnist.test.next_batch(self.batch_size)[0]
-            # test_images = np.reshape(test_images,[-1,28,28,1])
+
+            test_images = self.dataset.get_next_val_batch(sess)
             measure_dict = {
                 'recon_loss':[],
                 'psnr':[],
@@ -269,7 +260,7 @@ class vaegan(object):
             # inf_net = inf_def.InferenceNetwork()
             
             while step <= self.max_iters:
-                next_x_images = sess.run(self.next_x)
+                next_x_images = self.dataset.get_next_train_batch(sess)
 
                 theta_val = self.mdevice.sample_theta(
                     self.FLAGS, self.batch_size)
@@ -324,7 +315,7 @@ class vaegan(object):
                     # score_list.append(inception_score)
                     # summary_str = sess.run(self.summ[0], feed_dict=fd_test)
                     # summary_str = sess.run(summary_op1)
-                    lossy_images = np.clip(lossy_images, -1 , 1)
+                    lossy_images = np.clip(lossy_images, self.FLAGS.x_min , self.FLAGS.x_max)
                     # summary_writer_test.add_summary(summary_str, step)
                     sample_images = [test_images[0:self.batch_size], lossy_images[0:self.batch_size], rec_images[0:self.batch_size],
                                      generated_image[0:self.batch_size]]
@@ -332,7 +323,7 @@ class vaegan(object):
                     titles = ['orig', 'lossy', 'reconstructed',
                               'generated']
                     save_images(sample_images, [self.batch_size/8, 8],
-                                '{}/train_{:02d}_images.png'.format(self.log_dir, step), measure_dict, titles)
+                                '{}/train_{:02d}_images.png'.format(self.log_dir, step), measure_dict, titles, (self.FLAGS.x_min, self.FLAGS.x_max))
                 if (step+1) % self.save_every == 0:
                     self.saver.save(sess, self.ckp_dir + '/last.ckpt',global_step=global_step, latest_filename='last')                                 
                     print("Model saved in file: %s" % self.ckp_dir)
@@ -384,7 +375,8 @@ class vaegan(object):
                     self.saver.restore(sess, ckpt.model_checkpoint_path)
                     self.best_loss = np.load(self.ckp_dir + '/' + 'best_loss.npy')
                     print('model restored')
-            test_images = sess.run(self.next_x_val)
+            test_images = self.dataset.get_next_val_batch(sess)
+            
             theta_val = self.mdevice.sample_theta(self.FLAGS, self.batch_size)
             # sess.run(self.opt_reinit_op)
             
@@ -398,10 +390,10 @@ class vaegan(object):
             else:
                 img2save = self.get_unmeasure_pic(sess, test_images, theta_val)
             lossy = sess.run(self.x_lossy, feed_dict= {self.images: test_images, self.theta_ph: theta_val})
-        lossy = np.clip(lossy, -1, 1)
-        img2save = merge(img2save, [8,8])
-        lossy = merge(lossy, [8, 8])
-        test_images = merge(test_images, [8, 8])
+        lossy = np.clip(lossy, self.FLAGS.x_min, self.FLAGS.x_max)
+        img2save = merge(img2save, [8,8], (self.FLAGS.x_min , self.FLAGS.x_max))
+        lossy = merge(lossy, [8, 8], (self.FLAGS.x_min, self.FLAGS.x_max))
+        test_images = merge(test_images, [8, 8], (self.FLAGS.x_min , self.FLAGS.x_max))
         psnr, ssim = compute_pnsr_ssim(test_images, img2save)
         print ('psnr:{:.2f}, ssim:{:.2f}'.format(psnr, ssim))
         io.imsave('{}/{}.png'.format(self.log_dir,exp_name), img2save[:64])
@@ -442,11 +434,12 @@ class vaegan(object):
                 titles = ['orig', 'lossy', 'reconstructed']
                 images = sess.run(
                     [self.images, self.x_lossy, self.x_p], feed_dict=feed_dict)
-                images[1] = np.clip(images[1], -1, 1)
+                images[1] = np.clip(
+                    images[1], self.FLAGS.x_min, self.FLAGS.x_max)
                 measure_dict['recon_loss'].append(
                     ((images[0] - images[2])**2).mean())
                 save_images(images, [8, 8], '{}/test_{}_{}_{}/{}_images.png'.format(self.log_dir, self.ml1_w, self.dl1_w,
-                                                                                                self.zp_w, j), measure_dict, titles)
+                                                                                    self.zp_w, j), measure_dict, titles, (self.FLAGS.x_min, self.FLAGS.x_max))
         return images[2]
 
     def get_unmeasure_pic(self,sess, test_images, theta_val):
@@ -459,10 +452,10 @@ class vaegan(object):
         fd = {self.images:test_images, self.theta_ph: theta_val}
         x_lossy = sess.run(self.x_lossy, feed_dict=fd)
         x_rec = self.mdevice.unmeasure_np(self.FLAGS, x_lossy , theta_val)
-        x_rec = np.clip(x_rec, -1 , 1)
+        x_rec = np.clip(x_rec, self.FLAGS.x_min, self.FLAGS.x_max)
         
-        images = merge(test_images,[8, 8])
-        x_rec_merge = merge(x_rec, [8, 8])
+        images = merge(test_images,[8, 8], (self.FLAGS.x_min , self.FLAGS.x_max))
+        x_rec_merge = merge(x_rec, [8, 8], (self.FLAGS.x_min , self.FLAGS.x_max))
         psnr, ssim = compute_pnsr_ssim(images, x_rec_merge)
         return x_rec
 

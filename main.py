@@ -23,7 +23,7 @@ if __name__ == "__main__":
         str(FLAGS.alpha) + "_lambda2_" + \
         str(FLAGS.beta) + "_lambda3_" + str(FLAGS.gamma)
     mdevice = measure.get_mdevice(FLAGS) 
-    root_log_dir = "./vaeganlogs/" + experiment
+    root_log_dir = "./vaeganlogs_" + FLAGS.dataset + '/' + experiment
     vaegan_checkpoint_dir = "./model_vaegan/" + experiment 
     
     if FLAGS.load == 'none' and os.path.isdir(root_log_dir):

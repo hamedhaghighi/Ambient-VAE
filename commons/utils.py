@@ -17,10 +17,11 @@ import pdb
 def setup_vals(hparams):
     """Setup some values in hparams"""
     if hparams.dataset == 'mnist':
+        hparams.latent_dim = 20
         hparams.c_dim = 1
         hparams.image_dims = [28, 28, 1]
-        hparams.train_size = 60000
-        hparams.y_dim = 10  # [Optional] Number of labels
+        # hparams.train_size = 60000
+        # hparams.y_dim = 10  # [Optional] Number of labels
         hparams.x_min = 0
         hparams.x_max = 1
         hparams.signal_power = 0.11204461  # Assuming each pixel in [0, 1]
@@ -28,7 +29,7 @@ def setup_vals(hparams):
         hparams.c_dim = 3
         hparams.image_dims = [64, 64, 3]
         hparams.signal_power = 0.2885201  # Assuming each pixel in [-1, 1]
-
+        hparams.latent_dim = 20
     else:
         raise NotImplementedError
 

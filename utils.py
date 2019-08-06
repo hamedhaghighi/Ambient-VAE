@@ -60,8 +60,8 @@ def center_crop(x, crop_h , crop_w=None, resize_w=64):
 def compute_pnsr_ssim(x , y):
     return compare_psnr(x, y), compare_ssim(x, y, multichannel=True)
 
-def save_images(images, size, image_path, measure_dict, titles):
-    images = [merge(img , size) for img in images]
+def save_images(images, size, image_path, measure_dict, titles, x_range):
+    images = [merge(img , size, x_range) for img in images]
     PSNR, SSIM = compute_pnsr_ssim(images[0], images[2])
     measure_dict['psnr'].append(PSNR)
     measure_dict['ssim'].append(SSIM)
@@ -88,13 +88,13 @@ def imsave(images, size, path, measure_dict, titles):
     fig.savefig(path , format='png')
     plt.close()
 
-def merge(images, size):
+def merge(images, size, x_range):
     h, w = images.shape[1], images.shape[2]
     img = np.zeros((np.int64(h * size[0]), np.int64(w * size[1]), 3) , dtype = np.float32)
     for idx, image in enumerate(images):
         i = idx % size[1]
         j = idx // size[1]
-        img[j * h:j * h + h, i * w: i * w + w, :] = (image/2.0) + 0.5
+        img[j * h:j * h + h, i * w: i * w + w, :] = (image/(x_range[1] - x_range[0])) + np.abs(x_range[0])/2.0
 
     return img
 

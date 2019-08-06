@@ -1,4 +1,4 @@
-# pylint: disable = C0103, C0111, C0301, R0913, R0903, R0914, E1101
+    # pylint: disable = C0103, C0111, C0301, R0913, R0903, R0914, E1101
 
 """Implementations of measurement and unmeasurement"""
 
@@ -167,7 +167,6 @@ class DropCol(DropMaskType1):
 
 
 class DropRowCol(DropDevice):
-
     def sample_theta(self, hparams,batch_size):
         drop_row = DropRow(hparams)
         mask1 = drop_row.sample_theta(hparams)
@@ -274,10 +273,11 @@ class BlurAddNoise(MeasurementDevice):
         return x_measured
 
     def unmeasure_np(self, hparams, x_measured_val, theta_val):
-        if hparams.unmeasure_type == 'wiener':
-            x_unmeasured_val = measure_utils.wiener_deconv(hparams, x_measured_val)
-        else:
-            raise NotImplementedError
+        # x_unmeasured_val = measure_utils.wiener_deconv(hparams, x_measured_val)
+        x_unmeasured_val = np.zeros_like(x_measured_val)
+        for i in range(x_measured_val.shape[0]):
+            x_unmeasured_val[i] = signal.medfilt(x_measured_val[i])
+
         return x_unmeasured_val
 
 
