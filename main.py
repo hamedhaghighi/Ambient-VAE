@@ -49,7 +49,7 @@ if __name__ == "__main__":
     os.system('fuser 6006/tcp -k')
 
     # model_path = None if FLAGS.load == 'none' else vaegan_checkpoint_dir +'/' + FLAGS.load + '.ckpt'  
-    tf.random.set_random_seed(FLAGS.seed)
+    tf.set_random_seed(FLAGS.seed)
     batch_size = FLAGS.batch_size
     max_iters = FLAGS.max_iters if not FLAGS.test else 3
     latent_dim = FLAGS.latent_dim
