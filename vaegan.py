@@ -178,6 +178,7 @@ class vaegan(object):
             + self.zp_w * zp_loss_batch \
             + self.dl1_w * d_loss1_batch \
             + self.dl2_w * d_loss2_batch
+        self.recon_loss = tf.reduce_mean((self.images - self.x_p)**2)
         self.total_loss = tf.reduce_mean(total_loss_batch)
 
         self.m_loss1 = tf.reduce_mean(m_loss1_batch)
@@ -372,17 +373,21 @@ class vaegan(object):
             
             theta_val = self.mdevice.sample_theta(self.FLAGS, self.batch_size)
             # sess.run(self.opt_reinit_op)
-            
+            pre_time = time.time()
             if exp_name == 'iterative':
                 img2save= self.estimate(sess, learning_rate,
                             update_op, test_images, theta_val)
             elif exp_name == 'normal' or exp_name == 'supervised':
                 feed_dict = {self.images: test_images,
                                 self.theta_ph: theta_val}
+                
                 img2save = sess.run(self.x_tilde, feed_dict=feed_dict)
             else:
                 img2save = self.get_unmeasure_pic(sess, test_images, theta_val)
+            post_time = time.time() - pre_time
             lossy = sess.run(self.x_lossy, feed_dict= {self.images: test_images, self.theta_ph: theta_val})
+        recon_loss = ((img2save - test_images)**2).mean()
+        print("recon_loss:{} time:{}".format(recon_loss, post_time))
         lossy = np.clip(lossy, self.FLAGS.x_min, self.FLAGS.x_max)
         img2save = merge(img2save, [8,8], (self.FLAGS.x_min , self.FLAGS.x_max))
         lossy = merge(lossy, [8, 8], (self.FLAGS.x_min, self.FLAGS.x_max))
@@ -396,6 +401,8 @@ class vaegan(object):
 
 
     def estimate(self ,sess, learning_rate, update_op,test_images, theta_val):
+        time_loss = np.zeros((2, self.FLAGS.iter_test))
+        acc_time = 0
         measure_dict = {
             'recon_loss': [],
             'psnr': [],
@@ -406,17 +413,22 @@ class vaegan(object):
                 self.FLAGS, self.batch_size)
             feed_dict = {self.images: test_images,
                             self.theta_ph: theta_val, self.theta_ph_xp: theta_val_xp}
+            pre_time = time.time()
             _, lr_val, total_loss_val, \
                 m_loss1_val, \
                 m_loss2_val, \
                 zp_loss_val, \
                 d_loss1_val, \
-                d_loss2_val = sess.run([update_op, learning_rate, self.total_loss,
+                d_loss2_val, \
+                recon_loss = sess.run([update_op, learning_rate, self.total_loss,
                                         self.m_loss1,
                                         self.m_loss2,
                                         self.zp_loss,
                                         self.d_loss1,
-                                        self.d_loss2], feed_dict=feed_dict)
+                                        self.d_loss2,
+                                        self.recon_loss], feed_dict=feed_dict)
+            acc_time += time.time() - pre_time
+            time_loss[0, j], time_loss[1, j] = acc_time, recon_loss
             logging_format = 'rr {} iter {} lr {:.3f} total_loss {:.3f} m_loss1 {:.3f} m_loss2 {:.3f} zp_loss {:.3f} d_loss1 {:.3f} d_loss2 {:.3f}'
             print(logging_format.format(1, j, lr_val, total_loss_val,
                                         m_loss1_val,
@@ -433,7 +445,8 @@ class vaegan(object):
                 measure_dict['recon_loss'].append(
                     ((images[0] - images[2])**2).mean())
                 save_images(images, [8, 8], '{}/test_{}_{}_{}/{}_images.png'.format(self.log_dir, self.ml1_w, self.dl1_w,
-                                                                                    self.zp_w, j), measure_dict, titles, (self.FLAGS.x_min, self.FLAGS.x_max))
+                                                                                 self.zp_w, j), measure_dict, titles, (self.FLAGS.x_min, self.FLAGS.x_max))
+        np.save('{}/iterative_time.npy'.format(self.log_dir), time_loss)
         return images[2]
 
     def get_unmeasure_pic(self,sess, test_images, theta_val):
