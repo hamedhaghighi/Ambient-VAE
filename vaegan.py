@@ -394,10 +394,10 @@ class vaegan(object):
         test_images = merge(test_images, [8, 8], (self.FLAGS.x_min , self.FLAGS.x_max))
         psnr, ssim = compute_pnsr_ssim(test_images, img2save)
         print ('psnr:{:.2f}, ssim:{:.2f}'.format(psnr, ssim))
-        io.imsave('{}/{}.png'.format(self.log_dir,exp_name), img2save[:self.output_size])
+        io.imsave('{}/{}_{}.png'.format(self.log_dir,exp_name, self.FLAGS.seed), img2save)
         io.imsave('{}/orig.png'.format(self.log_dir),
-                  test_images[:self.output_size])
-        io.imsave('{}/lossy.png'.format(self.log_dir), lossy[:self.output_size])
+                  test_images)
+        io.imsave('{}/lossy.png'.format(self.log_dir), lossy)
 
 
     def estimate(self ,sess, learning_rate, update_op,test_images, theta_val):
