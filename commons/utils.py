@@ -29,7 +29,7 @@ def setup_vals(hparams):
         hparams.c_dim = 3
         hparams.image_dims = [64, 64, 3]
         hparams.signal_power = 0.2885201  # Assuming each pixel in [-1, 1]
-        hparams.latent_dim = 20
+        hparams.latent_dim = 128
     else:
         raise NotImplementedError
 
