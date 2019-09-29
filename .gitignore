@@ -104,7 +104,7 @@ venv.bak/
 .mypy_cache/
 .idea/
 *.npy
-*.png
+#*.png
 *.bpg
 *.flif
 # Prerequisites
