@@ -15,7 +15,7 @@ In this project we present a new VAE training procedure inspired by [Ambient GAN
 
   In this method, we reformulate the VAE loss in order to train the network with distorted images. To strengthen the ouput image quality, similar to [Auto-encoding beyond bayse approach], we add GAN loss to the model.
 
-<img src="images/loss.png" width="700">
+<img src="images/loss.png" width="500">
 <!-- ![loss-overview](images/loss.png=100*100) -->
 
 *Equation 1. Combined loss function*
