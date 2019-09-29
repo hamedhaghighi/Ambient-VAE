@@ -1,5 +1,5 @@
 # Ambient VAE-GAN
-In this project we present a new VAE training procedure inspired by [Ambient GAN]() reseach. For specific known group of forward models, our model has the ability to transform distorted images to clear ones without any supervision. 
+In this project we present a new VAE training procedure inspired by [Ambient GAN](https://openreview.net/forum?id=Hy7fDog0b) reseach. For specific known group of forward models, our model has the ability to transform distorted images to clear ones without any supervision. 
 
 ## Dependencies
 
@@ -15,7 +15,7 @@ In this project we present a new VAE training procedure inspired by [Ambient GAN
 
   In this method, we reformulate the VAE loss in order to train the network with distorted images. To strengthen the ouput image quality, similar to [Auto-encoding beyond bayse approach], we add GAN loss to the model.
 
-![loss-overview](images/loss.png)
+![loss-overview](images/loss.png =100x100)
 
 *Equation 1. Combined loss function*
 
@@ -34,7 +34,7 @@ Algorithm of trainig has been presented below.
 ## Qualitative Results
 
 ### CelebA
- We design three baselines of Supervised, ACSG ( combination of [CSGAN]() and [Ambient-GAN]()) and non-learned methods and compare our restored images with theirs visually. For three forward models of drop-independet, drop-patch and add-noise, the results have been presented in Fig.2 
+ We design three baselines of Supervised, ACSG ( combination of [CSGAN](https://arxiv.org/abs/1703.03208) and [Ambient-GAN](https://openreview.net/forum?id=Hy7fDog0b)) and non-learned methods and compare our restored images with theirs visually. For three forward models of drop-independet, drop-patch and add-noise, the results have been presented in Fig.2 
 	
 ![celeb-results](images/celeba-results.png)
 
