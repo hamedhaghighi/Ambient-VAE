@@ -23,11 +23,13 @@ In this project we present a new VAE training procedure inspired by [Ambient GAN
 As we have the approximation of posterior distribution, we have the relationship between pairs of distorted and clear images. So the problem is solved, at the infrence time, our ambient-VAE can be interpreted as an unsupervised image enhancer.
  
 The training procedure of network has been shown in Fig.1. likwise VAE-GAN, we have three sub-networks of Encoder, Decoder and Discriminator. we assume that the auto-encoder network outputs clear image and we ourselves distort it with known forward model. Then, we input the discriminator with the distorted images. 
-![network](images/arch.png)
+
+<img src="images/arch.png" width="600">
 
 *Fig.1 Network training procedure*
  
 Algorithm of trainig has been presented below.
+
 ![network](images/alg.png)
 
 *Fig.2 Algorithm of training*
@@ -53,11 +55,13 @@ Our resutls for Mnist dataset has been displayed in Fig.3
 
 For two criterion of PSNR and SSIM, we have compared our quantitative results with mentioned baselines, in Table.1.
 
-![mnist-results](images/table.png)
+!<img src="images/table.png" width="400">
 
 *Table.1 Quantitative comparison*
 
 Moreover, we have compared our MSE/time of our method to unsupervised baselines in Fig.4 . Since ACSG is an iterative method, we have plotted the relationship between MSE and time (in second) for this method. As it is shown in the figuer, our method has both the least performance time and MSE. Furthermore, the ACSG approach consumes 200 times as much as ours in order to have the same MSE.
+
+<img src="images/timevsmse.png" width="400">
 
 *Fig.5 Timing preformance comparison*
 
