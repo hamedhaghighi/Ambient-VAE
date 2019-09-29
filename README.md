@@ -1,4 +1,4 @@
-# Ambient VAE-GAN
+# Ambient VAE: an unsupervised method for image restoration
 In this project we present a new VAE training procedure inspired by [Ambient GAN](https://openreview.net/forum?id=Hy7fDog0b) reseach. For specific known group of forward models, our model has the ability to transform distorted images to clear ones without any supervision. 
 
 ## Dependencies
@@ -10,6 +10,7 @@ In this project we present a new VAE training procedure inspired by [Ambient GAN
 ## Dataset
 
 [CelebA dataset](http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html) - Using aligned images and then resizing it to 64x64 pixels
+[mnist dataset](http://yann.lecun.com/exdb/mnist/)
 
 ## Overview
 
