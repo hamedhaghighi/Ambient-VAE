@@ -9,7 +9,7 @@ In this project, we present a new VAE training procedure inspired by [Ambient GA
 
 ## Dataset
 
-[CelebA dataset](http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html) - Using aligned images and then resizing it to 64x64 pixels
+[CelebA dataset](http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html) - Using aligned images and then resizing it to 64x64 pixels  
 [mnist dataset](http://yann.lecun.com/exdb/mnist/)
 
 ## Overview
