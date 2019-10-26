@@ -1,4 +1,0 @@
-train2 drop 0 independent
-3_train 1 blur
-train 100 patch
-4_train 10 blur
